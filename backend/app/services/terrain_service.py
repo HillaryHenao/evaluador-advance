@@ -85,4 +85,10 @@ def get_terrain_data(code: str) -> Optional[dict]:
     else:
         row_dict['tipo_estructura'] = 'mesa_fija'
 
+    if row_dict.get('nivel_tension'):
+        row_dict['nivel_tension'] = row_dict['nivel_tension'].replace(' ', '')
+
+    if row_dict.get('aprovechamiento_forestal'):
+        row_dict['aprovechamiento_forestal'] = row_dict['aprovechamiento_forestal'].lower()
+
     return row_dict
