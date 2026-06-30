@@ -1,8 +1,47 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import AppHeader from '@/components/AppHeader.vue'
+import TerrainSearch from '@/components/TerrainSearch.vue'
+import CriterionCard from '@/components/CriterionCard.vue'
+import SummaryPanel from '@/components/SummaryPanel.vue'
+import { useEvaluatorStore } from '@/stores/evaluatorStore'
+import { evaluateCriteria } from '@/engine/evaluatorEngine'
+
+const store = useEvaluatorStore()
+
+const results = computed(() => evaluateCriteria(store.criterionValues, {
+  baseCapex: store.baseCapex,
+  kWp: store.kWp,
+}))
 </script>
 
 <template>
-  <div style="padding: 2rem; color: white;">
-    <p>Evaluador (placeholder — Task 8)</p>
+  <div class="evaluador-layout">
+    <AppHeader />
+    <div class="evaluador-body">
+      <main class="evaluador-main">
+        <TerrainSearch />
+        <div class="criteria-grid">
+          <CriterionCard
+            v-for="result in results"
+            :key="result.id"
+            :result="result"
+          />
+        </div>
+      </main>
+      <SummaryPanel />
+    </div>
   </div>
 </template>
+
+<style scoped>
+.evaluador-layout { display: flex; flex-direction: column; min-height: 100vh; }
+.evaluador-body { display: flex; flex: 1; overflow: hidden; }
+.evaluador-main { flex: 1; overflow-y: auto; }
+.criteria-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+}
+</style>
