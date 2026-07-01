@@ -11,6 +11,7 @@ const comunidad: CriterionModule = {
     { value: 'conflicto', label: 'Conflicto activo' },
   ],
   formulaDefined: false,
+  category: 'probabilidad',
   computeCost(_value: CriterionValue, _context: EvalContext): number {
     return 0
   },

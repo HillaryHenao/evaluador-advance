@@ -38,6 +38,7 @@ export function evaluateCriteria(
       sobrecosto,
       formulaDefined: criterion.formulaDefined,
       fromDb: criterion.dataSource === 'db',
+      category: criterion.category,
     }
   })
 }

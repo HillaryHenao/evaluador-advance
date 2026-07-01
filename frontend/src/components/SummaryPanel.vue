@@ -21,9 +21,9 @@ const activeBreakdown = computed(() =>
   <aside class="summary-panel">
     <h2 class="summary-title">Resumen de costos</h2>
 
-    <div class="summary-section">
-      <p class="summary-label">CAPEX base</p>
-      <p class="summary-value">{{ formatCOP(store.baseCapex) }}</p>
+    <div class="summary-row summary-row--spaced">
+      <span class="summary-label">CAPEX base</span>
+      <span class="summary-value">{{ formatCOP(store.baseCapex) }}</span>
     </div>
 
     <div class="summary-divider" />
@@ -39,13 +39,13 @@ const activeBreakdown = computed(() =>
 
     <div v-if="activeBreakdown.length > 0" class="summary-divider" />
 
-    <div class="summary-section">
-      <p class="summary-label">Total sobrecostos</p>
-      <p class="summary-value summary-value--orange">{{ formatCOP(store.aggregated.totalSobrecosto) }}</p>
+    <div class="summary-row summary-row--spaced">
+      <span class="summary-label">Total sobrecostos</span>
+      <span class="summary-value summary-value--orange">{{ formatCOP(store.aggregated.totalSobrecosto) }}</span>
     </div>
 
     <div class="summary-total">
-      <p class="summary-total-label">CAPEX Total</p>
+      <p class="summary-total-label">CAPEX Total estimado</p>
       <p class="summary-total-value">{{ formatCOP(store.aggregated.capexTotal) }}</p>
     </div>
   </aside>
@@ -55,34 +55,80 @@ const activeBreakdown = computed(() =>
 .summary-panel {
   width: 280px;
   min-width: 280px;
-  background: var(--color-navy-light);
-  border-left: 1px solid rgba(255,255,255,0.08);
+  background: var(--card);
+  border-left: 1.5px solid var(--border);
   padding: 1.5rem 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.65rem;
   position: sticky;
-  top: 56px;
-  height: calc(100vh - 56px);
+  top: 60px;
+  height: calc(100vh - 60px);
   overflow-y: auto;
+  box-shadow: -2px 0 12px rgba(145, 91, 216, 0.06);
 }
-.summary-title { font-size: 0.9rem; font-weight: 700; color: var(--color-nashville); margin-bottom: 0.25rem; }
-.summary-section { display: flex; justify-content: space-between; align-items: baseline; }
-.summary-label { font-size: 0.78rem; color: var(--color-gray); }
-.summary-value { font-size: 0.9rem; font-weight: 600; color: var(--color-white); }
-.summary-value--orange { color: var(--color-orange); }
-.summary-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 0.25rem 0; }
-.summary-empty { font-size: 0.78rem; color: var(--color-gray); text-align: center; padding: 0.5rem 0; }
-.summary-row { display: flex; justify-content: space-between; font-size: 0.8rem; }
-.summary-row-label { color: var(--color-white); }
-.summary-row-value { color: var(--color-lemony); font-weight: 600; }
+
+.summary-title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--purple);
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 0.1rem;
+}
+
+.summary-label { font-size: 0.75rem; color: var(--muted); font-weight: 500; }
+.summary-value { font-size: 0.9rem; font-weight: 700; color: var(--text); }
+.summary-value--orange { color: var(--orange); }
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.8rem;
+}
+.summary-row--spaced { margin: 0.1rem 0; }
+.summary-row-label { color: var(--text-mid); font-weight: 500; flex: 1; padding-right: 0.5rem; line-height: 1.35; }
+.summary-row-value { color: var(--purple); font-weight: 700; white-space: nowrap; }
+
+.summary-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0.2rem 0;
+}
+
+.summary-empty {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-align: center;
+  padding: 0.75rem 0;
+  background: #f9f5ff;
+  border-radius: 9px;
+  border: 1.5px dashed var(--border);
+}
+
 .summary-total {
-  margin-top: 0.25rem;
-  padding: 0.75rem;
-  background: rgba(226, 255, 101, 0.08);
-  border: 1px solid rgba(226, 255, 101, 0.25);
-  border-radius: 8px;
+  margin-top: 0.35rem;
+  padding: 0.85rem 1rem;
+  background: #13294B;
+  border-top: 3px solid #D6E965;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(19, 41, 75, 0.3);
 }
-.summary-total-label { font-size: 0.78rem; color: var(--color-nashville); margin-bottom: 0.25rem; }
-.summary-total-value { font-size: 1.15rem; font-weight: 700; color: var(--color-lemony); }
+.summary-total-label {
+  font-size: 0.72rem;
+  color: #8EC8E9;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 0.3rem;
+}
+.summary-total-value {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #D6E965;
+  letter-spacing: -0.5px;
+}
 </style>

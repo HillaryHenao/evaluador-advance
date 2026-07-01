@@ -8,6 +8,7 @@ const cluster: CriterionModule = {
   dataSource: 'db',
   dbField: 'cluster',
   formulaDefined: false,
+  category: 'fijo',
   computeCost(_value: CriterionValue, _context: EvalContext): number {
     return 0
   },

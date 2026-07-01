@@ -10,6 +10,7 @@ const disposicionMovimiento: CriterionModule = {
     { value: 'externo', label: 'Externo' },
   ],
   formulaDefined: false,
+  category: 'fijo',
   computeCost(_value: CriterionValue, _context: EvalContext): number {
     return 0
   },

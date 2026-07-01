@@ -13,6 +13,7 @@ const servidumbre: CriterionModule = {
     { value: 'public_and_foreign', label: 'Pública y Ajena' },
   ],
   formulaDefined: false,
+  category: 'probabilidad',
   computeCost(_value: CriterionValue, _context: EvalContext): number {
     return 0
   },

@@ -12,6 +12,7 @@ const nivelTension: CriterionModule = {
     { value: '115kV', label: '115 kV' },
   ],
   formulaDefined: false,
+  category: 'fijo',
   computeCost(_value: CriterionValue, _context: EvalContext): number {
     return 0
   },

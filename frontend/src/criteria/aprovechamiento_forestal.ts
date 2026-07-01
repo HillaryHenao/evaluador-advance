@@ -14,6 +14,7 @@ const aprovechamientoForestal: CriterionModule = {
     { value: 'car_0.1', label: 'CAR nivel 0.1' },
   ],
   formulaDefined: false,
+  category: 'ambas',
   computeCost(_value: CriterionValue, _context: EvalContext): number {
     return 0
   },

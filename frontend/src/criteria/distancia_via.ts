@@ -8,6 +8,7 @@ const distanciaVia: CriterionModule = {
   dataSource: 'db',
   dbField: 'distancia_via',
   formulaDefined: true,
+  category: 'fijo',
   computeCost(value: CriterionValue, _context: EvalContext): number {
     if (value === null || typeof value !== 'number' || value <= 0) return 0
     return value * 457_292

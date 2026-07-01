@@ -14,6 +14,7 @@ async function handleSearch() {
 <template>
   <div class="terrain-search">
     <div class="search-row">
+      <span class="search-label">Código terreno</span>
       <input
         v-model="code"
         type="text"
@@ -22,61 +23,120 @@ async function handleSearch() {
         @keyup.enter="handleSearch"
       />
       <button class="search-btn" @click="handleSearch" :disabled="store.loading">
-        {{ store.loading ? 'Buscando...' : 'Buscar' }}
+        <svg v-if="!store.loading" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        {{ store.loading ? 'Buscando...' : 'Consultar' }}
       </button>
     </div>
-    <div v-if="store.terrainData" class="terrain-info">
-      <span class="terrain-badge terrain-badge--ok">✓</span>
-      <span>{{ store.terrainData.code }}</span>
+
+    <div v-if="store.terrainData" class="terrain-info terrain-info--found">
+      <span class="terrain-check">✓</span>
+      <strong>{{ store.terrainData.code }}</strong>
       <span class="terrain-sep">·</span>
       <span>{{ store.terrainData.municipality }}</span>
       <span class="terrain-sep">·</span>
       <span>{{ store.terrainData.or ?? 'OR no disponible' }}</span>
     </div>
-    <div v-if="store.error" class="terrain-error">{{ store.error }}</div>
+
+    <div v-if="store.error" class="terrain-error">⚠ {{ store.error }}</div>
   </div>
 </template>
 
 <style scoped>
-.terrain-search { padding: 1rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.08); }
-.search-row { display: flex; gap: 0.75rem; }
+.terrain-search {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1.5px solid var(--border);
+  background: var(--card);
+}
+
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.search-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--purple);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  white-space: nowrap;
+}
+
 .search-input {
-  flex: 1;
-  max-width: 280px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 6px;
-  padding: 0.5rem 0.8rem;
-  color: var(--color-white);
+  background: #fff;
+  border: 1.5px solid var(--border);
+  border-radius: 9px;
+  padding: 0.55rem 0.9rem;
+  color: var(--text);
   font-family: 'Montserrat', sans-serif;
   font-size: 0.9rem;
-  outline: none;
-  transition: border-color 0.2s;
+  font-weight: 700;
+  letter-spacing: 1px;
   text-transform: uppercase;
+  outline: none;
+  width: 200px;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
-.search-input:focus { border-color: var(--color-lemony); }
+.search-input::placeholder {
+  text-transform: none;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: #bbb;
+}
+.search-input:focus {
+  border-color: var(--purple);
+  box-shadow: 0 0 0 3px rgba(145, 91, 216, 0.15);
+}
+
 .search-btn {
-  background: var(--color-lemony);
-  color: var(--color-navy);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--purple);
+  color: #fff;
   border: none;
-  border-radius: 6px;
-  padding: 0.5rem 1.2rem;
+  border-radius: 9px;
+  padding: 0.55rem 1.1rem;
   font-family: 'Montserrat', sans-serif;
   font-weight: 700;
   font-size: 0.85rem;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: all 0.2s;
+  white-space: nowrap;
 }
-.search-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.search-btn:hover { background: var(--purple-deep); color: var(--yellow); }
+.search-btn:active { transform: scale(0.97); }
+.search-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .terrain-info {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-top: 0.6rem;
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 9px;
   font-size: 0.85rem;
-  color: var(--color-nashville);
+  border: 1.5px solid transparent;
 }
-.terrain-badge--ok { color: var(--color-lemony); font-weight: 700; }
-.terrain-sep { opacity: 0.4; }
-.terrain-error { margin-top: 0.5rem; font-size: 0.82rem; color: #f87171; }
+.terrain-info--found {
+  background: #f0e8ff;
+  border-color: var(--purple);
+  color: var(--purple-deep);
+}
+.terrain-check { color: var(--purple); font-weight: 800; }
+.terrain-sep { color: var(--purple-soft); }
+
+.terrain-error {
+  margin-top: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--red);
+  background: rgba(220, 38, 38, 0.08);
+  padding: 0.4rem 0.75rem;
+  border-radius: 7px;
+  border: 1px solid rgba(220, 38, 38, 0.2);
+}
 </style>

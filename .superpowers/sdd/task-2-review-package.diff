@@ -1,0 +1,542 @@
+﻿diff --git a/frontend/src/criteria/__tests__/criteria.test.ts b/frontend/src/criteria/__tests__/criteria.test.ts
+new file mode 100644
+index 0000000..a8985f5
+--- /dev/null
++++ b/frontend/src/criteria/__tests__/criteria.test.ts
+@@ -0,0 +1,68 @@
++import { describe, it, expect } from 'vitest'
++import corte from '../corte'
++import lleno from '../lleno'
++import pilotes from '../pilotes'
++import distanciaRed from '../distancia_red'
++import distanciaVia from '../distancia_via'
++
++const ctx = { baseCapex: 4_000_000_000, kWp: 1320 }
++
++describe('corte', () => {
++  it('calcula 50.000 COP por m³', () => {
++    expect(corte.computeCost(100, ctx)).toBe(5_000_000)
++  })
++  it('retorna 0 para valor nulo', () => {
++    expect(corte.computeCost(null, ctx)).toBe(0)
++  })
++  it('tiene formulaDefined true', () => {
++    expect(corte.formulaDefined).toBe(true)
++  })
++})
++
++describe('lleno', () => {
++  it('calcula 250.000 COP por m³', () => {
++    expect(lleno.computeCost(10, ctx)).toBe(2_500_000)
++  })
++  it('retorna 0 para valor nulo', () => {
++    expect(lleno.computeCost(null, ctx)).toBe(0)
++  })
++})
++
++describe('pilotes', () => {
++  it('retorna 156.000.000 cuando es true', () => {
++    expect(pilotes.computeCost(true, ctx)).toBe(156_000_000)
++  })
++  it('retorna 0 cuando es false', () => {
++    expect(pilotes.computeCost(false, ctx)).toBe(0)
++  })
++})
++
++describe('distancia_red', () => {
++  it('aplica tarifa de 509.000/m para ≤99m', () => {
++    expect(distanciaRed.computeCost(65, ctx)).toBe(65 * 509_000)
++  })
++  it('aplica tarifa de 420.000/m para tramo 100-299m', () => {
++    expect(distanciaRed.computeCost(130, ctx)).toBe(130 * 420_000)
++  })
++  it('aplica tarifa de 380.000/m para tramo 300-499m', () => {
++    expect(distanciaRed.computeCost(400, ctx)).toBe(400 * 380_000)
++  })
++  it('aplica tarifa de 350.000/m para tramo 500-799m', () => {
++    expect(distanciaRed.computeCost(600, ctx)).toBe(600 * 350_000)
++  })
++  it('aplica tarifa de 312.500/m para ≥800m', () => {
++    expect(distanciaRed.computeCost(1000, ctx)).toBe(1000 * 312_500)
++  })
++  it('retorna 0 para valor nulo', () => {
++    expect(distanciaRed.computeCost(null, ctx)).toBe(0)
++  })
++})
++
++describe('distancia_via', () => {
++  it('calcula 457.292 COP por metro', () => {
++    expect(distanciaVia.computeCost(100, ctx)).toBe(100 * 457_292)
++  })
++  it('retorna 0 para valor nulo', () => {
++    expect(distanciaVia.computeCost(null, ctx)).toBe(0)
++  })
++})
+diff --git a/frontend/src/criteria/amenazas.ts b/frontend/src/criteria/amenazas.ts
+new file mode 100644
+index 0000000..2d490c1
+--- /dev/null
++++ b/frontend/src/criteria/amenazas.ts
+@@ -0,0 +1,19 @@
++import type { CriterionModule, CriterionValue, EvalContext } from '@/types'
++
++const amenazas: CriterionModule = {
++  id: 'amenazas',
++  label: 'Amenazas',
++  inputType: 'select',
++  dataSource: 'manual',
++  options: [
++    { value: 'baja', label: 'Baja' },
++    { value: 'media', label: 'Media' },
++    { value: 'alta', label: 'Alta' },
++  ],
++  formulaDefined: false,
++  computeCost(_value: CriterionValue, _context: EvalContext): number {
++    return 0
++  },
++}
++
++export default amenazas
+diff --git a/frontend/src/criteria/aprovechamiento_forestal.ts b/frontend/src/criteria/aprovechamiento_forestal.ts
+new file mode 100644
+index 0000000..fb8339d
+--- /dev/null
++++ b/frontend/src/criteria/aprovechamiento_forestal.ts
+@@ -0,0 +1,22 @@
++import type { CriterionModule, CriterionValue, EvalContext } from '@/types'
++
++const aprovechamientoForestal: CriterionModule = {
++  id: 'aprovechamiento_forestal',
++  label: 'Aprovechamiento forestal',
++  inputType: 'select',
++  dataSource: 'db',
++  dbField: 'aprovechamiento_forestal',
++  options: [
++    { value: 'exonerado', label: 'Exonerado' },
++    { value: 'car_0.9', label: 'CAR nivel 0.9' },
++    { value: 'car_0.8', label: 'CAR nivel 0.8' },
++    { value: 'car_0.6', label: 'CAR nivel 0.6' },
++    { value: 'car_0.1', label: 'CAR nivel 0.1' },
++  ],
++  formulaDefined: false,
++  computeCost(_value: CriterionValue, _context: EvalContext): number {
++    return 0
++  },
++}
++
++export default aprovechamientoForestal
+diff --git a/frontend/src/criteria/cluster.ts b/frontend/src/criteria/cluster.ts
+new file mode 100644
+index 0000000..3a9e417
+--- /dev/null
++++ b/frontend/src/criteria/cluster.ts
+@@ -0,0 +1,16 @@
++import type { CriterionModule, CriterionValue, EvalContext } from '@/types'
++
++const cluster: CriterionModule = {
++  id: 'cluster',
++  label: 'Cluster',
++  inputType: 'number',
++  unit: '# proyectos',
++  dataSource: 'db',
++  dbField: 'cluster',
++  formulaDefined: false,
++  computeCost(_value: CriterionValue, _context: EvalContext): number {
++    return 0
++  },
++}
++
++export default cluster
+diff --git a/frontend/src/criteria/coexistencias.ts b/frontend/src/criteria/coexistencias.ts
+new file mode 100644
+index 0000000..2685d52
+--- /dev/null
++++ b/frontend/src/criteria/coexistencias.ts
+@@ -0,0 +1,15 @@
++import type { CriterionModule, CriterionValue, EvalContext } from '@/types'
++
++const coexistencias: CriterionModule = {
++  id: 'coexistencias',
++  label: 'Coexistencias',
++  inputType: 'toggle',
++  dataSource: 'db',
++  dbField: 'coexistencias',
++  formulaDefined: false,
++  computeCost(_value: CriterionValue, _context: EvalContext): number {
++    return 0
++  },
++}
++
++export default coexistencias
+diff --git a/frontend/src/criteria/comunidad.ts b/frontend/src/criteria/comunidad.ts
+new file mode 100644
+index 0000000..538ec50
+--- /dev/null
++++ b/frontend/src/criteria/comunidad.ts
+@@ -0,0 +1,19 @@
++import type { CriterionModule, CriterionValue, EvalContext } from '@/types'
++
++const comunidad: CriterionModule = {
++  id: 'comunidad',
++  label: 'Comunidad',
++  inputType: 'select',
++  dataSource: 'manual',
++  options: [
++    { value: 'sin_restriccion', label: 'Sin restricción' },
++    { value: 'consulta_previa', label: 'Consulta previa' },
++    { value: 'conflicto', label: 'Conflicto activo' },
++  ],
++  formulaDefined: false,
++  computeCost(_value: CriterionValue, _context: EvalContext): number {
++    return 0
++  },
++}
++
++export default comunidad
+diff --git a/frontend/src/criteria/corte.ts b/frontend/src/criteria/corte.ts
+new file mode 100644
+index 0000000..1847483
+--- /dev/null
++++ b/frontend/src/criteria/corte.ts
+@@ -0,0 +1,16 @@
++import type { CriterionModule, CriterionValue, EvalContext } from '@/types'
++
++const corte: CriterionModule = {
++  id: 'corte',
++  label: 'Corte',
++  inputType: 'number',
++  unit: 'm³',
++  dataSource: 'manual',
++  formulaDefined: true,
++  computeCost(value: CriterionValue, _context: EvalContext): number {
++    if (value === null || typeof value !== 'number') return 0
++    return value * 50_000
++  },
++}
++
++export default corte
+diff --git a/frontend/src/criteria/disposicion_movimiento.ts b/frontend/src/criteria/disposicion_movimiento.ts
+new file mode 100644
+index 0000000..a0c0196
+--- /dev/null
++++ b/frontend/src/criteria/disposicion_movimiento.ts
+@@ -0,0 +1,18 @@
++import type { CriterionModule, CriterionValue, EvalContext } from '@/types'
++
++const disposicionMovimiento: CriterionModule = {
++  id: 'disposicion_movimiento',
++  label: 'Disposición del movimiento',
++  inputType: 'select',
++  dataSource: 'manual',
++  options: [
++    { value: 'en_sitio', label: 'En sitio' },
++    { value: 'externo', label: 'Externo' },
++  ],
++  formulaDefined: false,
++  computeCost(_value: CriterionValue, _context: EvalContext): number {
++    return 0
++  },
++}
++
++export default disposicionMovimiento
+diff --git a/frontend/src/criteria/distancia_red.ts b/frontend/src/criteria/distancia_red.ts
+new file mode 100644
+index 0000000..544c7dc
+--- /dev/null
++++ b/frontend/src/criteria/distancia_red.ts
+@@ -0,0 +1,25 @@
++import type { CriterionModule, CriterionValue, EvalContext } from '@/types'
++
++function tieredCostPerMeter(meters: number): number {
++  if (meters <= 99) return 509_000
++  if (meters <= 299) return 420_000
++  if (meters <= 499) return 380_000
++  if (meters <= 799) return 350_000
++  return 312_500
++}
++
++const distanciaRed: CriterionModule = {
++  id: 'distancia_red',
++  label: 'Distancia a la red',
++  inputType: 'number',
++  unit: 'm',
++  dataSource: 'db',
++  dbField: 'distancia_red',
++  formulaDefined: true,
++  computeCost(value: CriterionValue, _context: EvalContext): number {
++    if (value === null || typeof value !== 'number' || value <= 0) return 0
++    return value * tieredCostPerMeter(value)
++  },
++}
++
++export default distanciaRed
+diff --git a/frontend/src/criteria/distancia_via.ts b/frontend/src/criteria/distancia_via.ts
+new file mode 100644
+index 0000000..51b4614
+--- /dev/null
++++ b/frontend/src/criteria/distancia_via.ts
+@@ -0,0 +1,17 @@
++import type { CriterionModule, CriterionValue, EvalContext } from '@/types'
++
++const distanciaVia: CriterionModule = {
++  id: 'distancia_via',
++  label: 'Distancia a la vía',
++  inputType: 'number',
++  unit: 'm',
++  dataSource: 'db',
++  dbField: 'distancia_via',
++  formulaDefined: true,
++  computeCost(value: CriterionValue, _context: EvalContext): number {
++    if (value === null || typeof value !== 'number' || value <= 0) return 0
++    return value * 457_292
++  },
++}
++
++export default distanciaVia
+diff --git a/frontend/src/criteria/lleno.ts b/frontend/src/criteria/lleno.ts
+new file mode 100644
+index 0000000..93f35c0
+--- /dev/null
++++ b/frontend/src/criteria/lleno.ts
+@@ -0,0 +1,16 @@
++import type { CriterionModule, CriterionValue, EvalContext } from '@/types'
++
++const lleno: CriterionModule = {
++  id: 'lleno',
++  label: 'Lleno',
++  inputType: 'number',
++  unit: 'm³',
++  dataSource: 'manual',
++  formulaDefined: true,
++  computeCost(value: CriterionValue, _context: EvalContext): number {
++    if (value === null || typeof value !== 'number') return 0
++    return value * 250_000
++  },
++}
++
++export default lleno
+diff --git a/frontend/src/criteria/nivel_tension.ts b/frontend/src/criteria/nivel_tension.ts
+new file mode 100644
+index 0000000..147dc20
+--- /dev/null
++++ b/frontend/src/criteria/nivel_tension.ts
+@@ -0,0 +1,20 @@
++import type { CriterionModule, CriterionValue, EvalContext } from '@/types'
++
++const nivelTension: CriterionModule = {
++  id: 'nivel_tension',
++  label: 'Nivel de tensión',
++  inputType: 'select',
++  dataSource: 'db',
++  dbField: 'nivel_tension',
++  options: [
++    { value: '13.8kV', label: '13.8 kV' },
++    { value: '34.5kV', label: '34.5 kV' },
++    { value: '115kV', label: '115 kV' },
++  ],
++  formulaDefined: false,
++  computeCost(_value: CriterionValue, _context: EvalContext): number {
++    return 0
++  },
++}
++
++export default nivelTension
+diff --git a/frontend/src/criteria/numero_arboles.ts b/frontend/src/criteria/numero_arboles.ts
+new file mode 100644
+index 0000000..7a03fa1
+--- /dev/null
++++ b/frontend/src/criteria/numero_arboles.ts
+@@ -0,0 +1,15 @@
++import type { CriterionModule, CriterionValue, EvalContext } from '@/types'
++
++const numeroArboles: CriterionModule = {
++  id: 'numero_arboles',
++  label: 'Número de árboles',
++  inputType: 'number',
++  unit: 'árboles',
++  dataSource: 'manual',
++  formulaDefined: false,
++  computeCost(_value: CriterionValue, _context: EvalContext): number {
++    return 0
++  },
++}
++
++export default numeroArboles
+diff --git a/frontend/src/criteria/obras_hidraulicas.ts b/frontend/src/criteria/obras_hidraulicas.ts
+new file mode 100644
+index 0000000..980f3c2
+--- /dev/null
++++ b/frontend/src/criteria/obras_hidraulicas.ts
+@@ -0,0 +1,20 @@
++import type { CriterionModule, CriterionValue, EvalContext } from '@/types'
++
++const obrasHidraulicas: CriterionModule = {
++  id: 'obras_hidraulicas',
++  label: 'Obras hidráulicas',
++  inputType: 'select',
++  dataSource: 'manual',
++  options: [
++    { value: 'ninguna', label: 'Ninguna' },
++    { value: 'baja', label: 'Baja' },
++    { value: 'media', label: 'Media' },
++    { value: 'alta', label: 'Alta' },
++  ],
++  formulaDefined: false,
++  computeCost(_value: CriterionValue, _context: EvalContext): number {
++    return 0
++  },
++}
++
++export default obrasHidraulicas
+diff --git a/frontend/src/criteria/ocupacion_cauce.ts b/frontend/src/criteria/ocupacion_cauce.ts
+new file mode 100644
+index 0000000..f8330d5
+--- /dev/null
++++ b/frontend/src/criteria/ocupacion_cauce.ts
+@@ -0,0 +1,15 @@
++import type { CriterionModule, CriterionValue, EvalContext } from '@/types'
++
++const ocupacionCauce: CriterionModule = {
++  id: 'ocupacion_cauce',
++  label: 'Ocupación de cauce',
++  inputType: 'toggle',
++  dataSource: 'db',
++  dbField: 'ocupacion_cauce',
++  formulaDefined: false,
++  computeCost(_value: CriterionValue, _context: EvalContext): number {
++    return 0
++  },
++}
++
++export default ocupacionCauce
+diff --git a/frontend/src/criteria/or.ts b/frontend/src/criteria/or.ts
+new file mode 100644
+index 0000000..6b2ee8c
+--- /dev/null
++++ b/frontend/src/criteria/or.ts
+@@ -0,0 +1,25 @@
++import type { CriterionModule, CriterionValue, EvalContext } from '@/types'
++
++const or: CriterionModule = {
++  id: 'or',
++  label: 'Operador de Red',
++  inputType: 'select',
++  dataSource: 'db',
++  dbField: 'or',
++  options: [
++    { value: 'AFINIA', label: 'AFINIA' },
++    { value: 'ESSA', label: 'ESSA' },
++    { value: 'EPM', label: 'EPM' },
++    { value: 'ENEL', label: 'ENEL' },
++    { value: 'EMCALI', label: 'EMCALI' },
++    { value: 'ENERCA', label: 'ENERCA' },
++    { value: 'CENS', label: 'CENS' },
++    { value: 'CEDENAR', label: 'CEDENAR' },
++  ],
++  formulaDefined: false,
++  computeCost(_value: CriterionValue, _context: EvalContext): number {
++    return 0
++  },
++}
++
++export default or
+diff --git a/frontend/src/criteria/pilotes.ts b/frontend/src/criteria/pilotes.ts
+new file mode 100644
+index 0000000..743d368
+--- /dev/null
++++ b/frontend/src/criteria/pilotes.ts
+@@ -0,0 +1,15 @@
++import type { CriterionModule, CriterionValue, EvalContext } from '@/types'
++
++const pilotes: CriterionModule = {
++  id: 'pilotes',
++  label: 'Pilotes',
++  inputType: 'toggle',
++  dataSource: 'manual',
++  formulaDefined: true,
++  computeCost(value: CriterionValue, _context: EvalContext): number {
++    if (value !== true) return 0
++    return 156_000_000
++  },
++}
++
++export default pilotes
+diff --git a/frontend/src/criteria/propietario.ts b/frontend/src/criteria/propietario.ts
+new file mode 100644
+index 0000000..07ae2a7
+--- /dev/null
++++ b/frontend/src/criteria/propietario.ts
+@@ -0,0 +1,21 @@
++import type { CriterionModule, CriterionValue, EvalContext } from '@/types'
++
++const propietario: CriterionModule = {
++  id: 'propietario',
++  label: 'Propietario',
++  inputType: 'select',
++  dataSource: 'manual',
++  options: [
++    { value: '5', label: '★★★★★' },
++    { value: '4', label: '★★★★' },
++    { value: '3', label: '★★★' },
++    { value: '2', label: '★★' },
++    { value: '1', label: '★' },
++  ],
++  formulaDefined: false,
++  computeCost(_value: CriterionValue, _context: EvalContext): number {
++    return 0
++  },
++}
++
++export default propietario
+diff --git a/frontend/src/criteria/servidumbre.ts b/frontend/src/criteria/servidumbre.ts
+new file mode 100644
+index 0000000..88f082e
+--- /dev/null
++++ b/frontend/src/criteria/servidumbre.ts
+@@ -0,0 +1,21 @@
++import type { CriterionModule, CriterionValue, EvalContext } from '@/types'
++
++const servidumbre: CriterionModule = {
++  id: 'servidumbre',
++  label: 'Servidumbre',
++  inputType: 'select',
++  dataSource: 'db',
++  dbField: 'servidumbre',
++  options: [
++    { value: 'own', label: 'Propia' },
++    { value: 'public', label: 'Pública' },
++    { value: 'foreign', label: 'Ajena' },
++    { value: 'public_and_foreign', label: 'Pública y Ajena' },
++  ],
++  formulaDefined: false,
++  computeCost(_value: CriterionValue, _context: EvalContext): number {
++    return 0
++  },
++}
++
++export default servidumbre
+diff --git a/frontend/src/criteria/tipo_estructura.ts b/frontend/src/criteria/tipo_estructura.ts
+new file mode 100644
+index 0000000..adb23e5
+--- /dev/null
++++ b/frontend/src/criteria/tipo_estructura.ts
+@@ -0,0 +1,19 @@
++import type { CriterionModule, CriterionValue, EvalContext } from '@/types'
++
++const tipoEstructura: CriterionModule = {
++  id: 'tipo_estructura',
++  label: 'Tipo de estructura',
++  inputType: 'select',
++  dataSource: 'db',
++  dbField: 'tipo_estructura',
++  options: [
++    { value: 'mesa_fija', label: 'Mesa fija' },
++    { value: 'tracker', label: 'Tracker' },
++  ],
++  formulaDefined: false,
++  computeCost(_value: CriterionValue, _context: EvalContext): number {
++    return 0
++  },
++}
++
++export default tipoEstructura

@@ -28,10 +28,10 @@ async function handleLogin() {
 <template>
   <div class="login-container">
     <div class="login-card">
-      <div class="login-logo">
-        <span class="login-logo-text">Solé</span>
+      <div class="login-brand">
+        <span class="login-logo">Solé</span>
+        <span class="login-subtitle">Evaluador Advance</span>
       </div>
-      <h1 class="login-title">Evaluador Advance</h1>
       <form @submit.prevent="handleLogin" class="login-form">
         <div class="login-field">
           <label for="username">Usuario</label>
@@ -70,61 +70,86 @@ async function handleLogin() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-navy);
+  background: var(--bg);
 }
+
 .login-card {
-  background-color: var(--color-navy-light);
-  border: 1px solid rgba(226, 255, 101, 0.2);
-  border-radius: 12px;
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 18px;
   padding: 2.5rem;
   width: 100%;
   max-width: 380px;
+  box-shadow: 0 8px 40px rgba(145, 91, 216, 0.12);
 }
-.login-logo {
+
+.login-brand {
   text-align: center;
-  margin-bottom: 0.5rem;
-}
-.login-logo-text {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--color-lemony);
-  letter-spacing: -0.02em;
-}
-.login-title {
-  text-align: center;
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--color-nashville);
   margin-bottom: 2rem;
 }
+.login-logo {
+  display: block;
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--purple);
+  letter-spacing: -0.02em;
+}
+.login-subtitle {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--muted);
+  margin-top: 0.2rem;
+  display: block;
+}
+
 .login-form { display: flex; flex-direction: column; gap: 1rem; }
 .login-field { display: flex; flex-direction: column; gap: 0.4rem; }
-.login-field label { font-size: 0.85rem; font-weight: 500; color: var(--color-nashville); }
+.login-field label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-mid);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
 .login-field input {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 6px;
-  padding: 0.6rem 0.8rem;
-  color: var(--color-white);
+  background: #faf8fe;
+  border: 1.5px solid var(--border);
+  border-radius: 9px;
+  padding: 0.65rem 0.9rem;
+  color: var(--text);
   font-family: 'Montserrat', sans-serif;
   font-size: 0.9rem;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
-.login-field input:focus { border-color: var(--color-lemony); }
-.login-error { color: #f87171; font-size: 0.82rem; text-align: center; }
+.login-field input:focus {
+  border-color: var(--purple);
+  box-shadow: 0 0 0 3px rgba(145, 91, 216, 0.15);
+  background: #fff;
+}
+
+.login-error {
+  color: var(--red);
+  font-size: 0.82rem;
+  text-align: center;
+  background: rgba(220, 38, 38, 0.07);
+  padding: 0.4rem;
+  border-radius: 7px;
+}
+
 .login-btn {
   margin-top: 0.5rem;
-  background-color: var(--color-lemony);
-  color: var(--color-navy);
+  background: var(--purple);
+  color: #fff;
   border: none;
-  border-radius: 6px;
-  padding: 0.7rem;
+  border-radius: 9px;
+  padding: 0.75rem;
   font-family: 'Montserrat', sans-serif;
   font-weight: 700;
   font-size: 0.9rem;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: all 0.2s;
 }
-.login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.login-btn:hover { background: var(--purple-deep); }
+.login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>

@@ -1,0 +1,196 @@
+﻿diff --git a/frontend/src/App.vue b/frontend/src/App.vue
+new file mode 100644
+index 0000000..4a01003
+--- /dev/null
++++ b/frontend/src/App.vue
+@@ -0,0 +1,6 @@
++<script setup lang="ts">
++</script>
++
++<template>
++  <RouterView />
++</template>
+diff --git a/frontend/src/assets/main.css b/frontend/src/assets/main.css
+new file mode 100644
+index 0000000..510bb89
+--- /dev/null
++++ b/frontend/src/assets/main.css
+@@ -0,0 +1,24 @@
++@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;700&display=swap');
++
++:root {
++  --color-navy: #152644;
++  --color-navy-light: #1e3459;
++  --color-lemony: #E2FF65;
++  --color-nashville: #8EC3E1;
++  --color-white: #ffffff;
++  --color-gray: #6b7280;
++  --color-orange: #f97316;
++}
++
++* {
++  box-sizing: border-box;
++  margin: 0;
++  padding: 0;
++}
++
++body {
++  font-family: 'Montserrat', sans-serif;
++  background-color: var(--color-navy);
++  color: var(--color-white);
++  min-height: 100vh;
++}
+diff --git a/frontend/src/main.ts b/frontend/src/main.ts
+new file mode 100644
+index 0000000..aa07ea0
+--- /dev/null
++++ b/frontend/src/main.ts
+@@ -0,0 +1,10 @@
++import { createApp } from 'vue'
++import { createPinia } from 'pinia'
++import App from './App.vue'
++import router from './router'
++import './assets/main.css'
++
++const app = createApp(App)
++app.use(createPinia())
++app.use(router)
++app.mount('#app')
+diff --git a/frontend/src/router/index.ts b/frontend/src/router/index.ts
+new file mode 100644
+index 0000000..835241d
+--- /dev/null
++++ b/frontend/src/router/index.ts
+@@ -0,0 +1,8 @@
++import { createRouter, createWebHistory } from 'vue-router'
++
++const router = createRouter({
++  history: createWebHistory(),
++  routes: [],
++})
++
++export default router
+diff --git a/frontend/src/types/index.ts b/frontend/src/types/index.ts
+new file mode 100644
+index 0000000..f360c73
+--- /dev/null
++++ b/frontend/src/types/index.ts
+@@ -0,0 +1,69 @@
++export type CriterionValue = number | boolean | string | null
++
++export interface EvalContext {
++  baseCapex: number
++  kWp: number
++}
++
++export interface CriterionResult {
++  id: string
++  label: string
++  value: CriterionValue
++  sobrecosto: number
++  formulaDefined: boolean
++  fromDb: boolean
++}
++
++export interface AggregatedResult {
++  totalSobrecosto: number
++  capexTotal: number
++  breakdown: CriterionResult[]
++}
++
++export interface SelectOption {
++  value: string
++  label: string
++}
++
++export interface CriterionModule {
++  id: string
++  label: string
++  inputType: 'number' | 'toggle' | 'select'
++  unit?: string
++  dataSource: 'manual' | 'db' | 'db_or_manual'
++  dbField?: string
++  options?: SelectOption[]
++  formulaDefined: boolean
++  computeCost: (value: CriterionValue, context: EvalContext) => number
++}
++
++export interface TerrainData {
++  code: string
++  name: string
++  municipality: string
++  distancia_via: number | null
++  distancia_red: number | null
++  or: string | null
++  nivel_tension: string | null
++  cluster: number | null
++  tipo_estructura: string | null
++  ocupacion_cauce: boolean | null
++  servidumbre: string | null
++  aprovechamiento_forestal: string | null
++  coexistencias: boolean | null
++}
++
++export interface AuthUser {
++  pk: number
++  username: string
++  email: string
++  first_name: string
++  last_name: string
++  groups: string[]
++}
++
++export interface AuthTokens {
++  access: string
++  refresh: string
++  user: AuthUser
++}
+diff --git a/frontend/tsconfig.app.json b/frontend/tsconfig.app.json
+new file mode 100644
+index 0000000..f7b1941
+--- /dev/null
++++ b/frontend/tsconfig.app.json
+@@ -0,0 +1,23 @@
++{
++  "extends": "@vue/tsconfig/tsconfig.dom.json",
++  "compilerOptions": {
++    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
++    "types": ["vite/client"],
++    "allowArbitraryExtensions": true,
++
++    /* Strict mode */
++    "strict": true,
++
++    /* Path alias */
++    "paths": {
++      "@/*": ["./src/*"]
++    },
++
++    /* Linting */
++    "noUnusedLocals": true,
++    "noUnusedParameters": true,
++    "erasableSyntaxOnly": true,
++    "noFallthroughCasesInSwitch": true
++  },
++  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"]
++}
+diff --git a/frontend/vite.config.ts b/frontend/vite.config.ts
+new file mode 100644
+index 0000000..286ca6e
+--- /dev/null
++++ b/frontend/vite.config.ts
+@@ -0,0 +1,14 @@
++import { defineConfig } from 'vite'
++import vue from '@vitejs/plugin-vue'
++import { resolve } from 'path'
++
++export default defineConfig({
++  plugins: [vue()],
++  resolve: {
++    alias: { '@': resolve(__dirname, 'src') },
++  },
++  test: {
++    environment: 'happy-dom',
++    globals: true,
++  },
++})

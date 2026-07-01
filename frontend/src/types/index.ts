@@ -5,6 +5,8 @@ export interface EvalContext {
   kWp: number
 }
 
+export type CriterionCategory = 'fijo' | 'probabilidad' | 'ambas'
+
 export interface CriterionResult {
   id: string
   label: string
@@ -12,6 +14,7 @@ export interface CriterionResult {
   sobrecosto: number
   formulaDefined: boolean
   fromDb: boolean
+  category: CriterionCategory
 }
 
 export interface AggregatedResult {
@@ -34,6 +37,7 @@ export interface CriterionModule {
   dbField?: string
   options?: SelectOption[]
   formulaDefined: boolean
+  category: CriterionCategory
   computeCost: (value: CriterionValue, context: EvalContext) => number
 }
 

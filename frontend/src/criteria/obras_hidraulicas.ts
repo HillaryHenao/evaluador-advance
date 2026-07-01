@@ -12,6 +12,7 @@ const obrasHidraulicas: CriterionModule = {
     { value: 'alta', label: 'Alta' },
   ],
   formulaDefined: false,
+  category: 'ambas',
   computeCost(_value: CriterionValue, _context: EvalContext): number {
     return 0
   },

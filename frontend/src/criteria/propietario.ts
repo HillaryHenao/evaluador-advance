@@ -13,6 +13,7 @@ const propietario: CriterionModule = {
     { value: '1', label: '★' },
   ],
   formulaDefined: false,
+  category: 'probabilidad',
   computeCost(_value: CriterionValue, _context: EvalContext): number {
     return 0
   },

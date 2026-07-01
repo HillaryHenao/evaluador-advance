@@ -7,6 +7,9 @@ export default defineConfig({
   resolve: {
     alias: { '@': resolve(__dirname, 'src') },
   },
+  server: {
+    proxy: { '/api': 'http://localhost:5000' },
+  },
   test: {
     environment: 'happy-dom',
     globals: true,

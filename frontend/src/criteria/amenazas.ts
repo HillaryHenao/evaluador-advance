@@ -11,6 +11,7 @@ const amenazas: CriterionModule = {
     { value: 'alta', label: 'Alta' },
   ],
   formulaDefined: false,
+  category: 'probabilidad',
   computeCost(_value: CriterionValue, _context: EvalContext): number {
     return 0
   },
