@@ -16,7 +16,7 @@ const results = computed(() => evaluateCriteria(store.criterionValues, {
 
 const FIJO_ORDER = [
   'distancia_red', 'distancia_via',
-  'corte', 'lleno', 'disposicion_movimiento',
+  'corte', 'lleno',
   'nivel_tension', 'cluster',
   'obras_hidraulicas', 'aprovechamiento_forestal',
 ]
