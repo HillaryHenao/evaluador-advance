@@ -2,6 +2,8 @@ import type { CriterionModule, CriterionValue, EvalContext, CriterionResult, Agg
 
 type CriterionValues = Record<string, CriterionValue>
 
+export const COSTO_POR_MES = 60_000_000
+
 let _cachedCriteria: CriterionModule[] | null = null
 
 export function loadCriteria(): CriterionModule[] {
@@ -47,13 +49,21 @@ export function aggregateCosts(
   results: CriterionResult[],
   context: EvalContext,
 ): AggregatedResult {
-  const totalSobrecosto = results
-    .filter(r => r.formulaDefined && r.value !== null)
+  const active = results.filter(r => r.formulaDefined && r.value !== null)
+
+  const totalSobrecostoFijo = active
+    .filter(r => r.category === 'fijo' || r.category === 'ambas')
+    .reduce((acc, r) => acc + r.sobrecosto, 0)
+
+  const totalRetraso = active
+    .filter(r => r.category === 'probabilidad')
     .reduce((acc, r) => acc + r.sobrecosto, 0)
 
   return {
-    totalSobrecosto,
-    capexTotal: context.baseCapex + totalSobrecosto,
+    totalSobrecostoFijo,
+    capexTotal: context.baseCapex + totalSobrecostoFijo,
+    totalRetraso,
+    totalRetrasoMeses: totalRetraso / COSTO_POR_MES,
     breakdown: results,
   }
 }

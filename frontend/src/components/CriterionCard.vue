@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useEvaluatorStore } from '@/stores/evaluatorStore'
-import { loadCriteria } from '@/engine/evaluatorEngine'
+import { loadCriteria, COSTO_POR_MES } from '@/engine/evaluatorEngine'
 import type { CriterionResult } from '@/types'
 
 const props = defineProps<{ result: CriterionResult }>()
@@ -19,6 +19,11 @@ function formatCOP(value: number): string {
   if (value === 0) return '—'
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value)
 }
+
+const delayMonths = computed(() => {
+  if (props.result.category !== 'probabilidad') return 0
+  return Math.round(props.result.sobrecosto / COSTO_POR_MES)
+})
 
 function handleInput(event: Event) {
   const target = event.target as HTMLInputElement
@@ -90,10 +95,19 @@ function handleToggle(event: Event) {
       </template>
     </div>
 
-    <div class="card-cost" v-if="result.formulaDefined">
+    <!-- Criterio fijo: muestra COP -->
+    <div class="card-cost" v-if="result.formulaDefined && result.category !== 'probabilidad'">
       <span class="cost-label">Sobrecosto</span>
       <span class="cost-value" :class="{ 'cost-value--zero': result.sobrecosto === 0 }">
         {{ formatCOP(result.sobrecosto) }}
+      </span>
+    </div>
+
+    <!-- Criterio probabilidad: muestra meses de retraso -->
+    <div class="card-cost card-cost--retraso" v-if="result.formulaDefined && result.category === 'probabilidad' && result.value !== null">
+      <span class="cost-label">Retraso estimado</span>
+      <span class="retraso-chip" :class="{ 'retraso-chip--zero': delayMonths === 0 }">
+        {{ delayMonths === 0 ? 'Sin retraso' : `${delayMonths} mes${delayMonths !== 1 ? 'es' : ''}` }}
       </span>
     </div>
   </div>
@@ -223,4 +237,20 @@ function handleToggle(event: Event) {
 .cost-label { font-size: 0.75rem; color: var(--muted); font-weight: 600; }
 .cost-value { font-size: 0.88rem; font-weight: 700; color: var(--purple); }
 .cost-value--zero { color: var(--muted); font-weight: 400; }
+
+.card-cost--retraso { border-top-color: rgba(217, 119, 6, 0.2); }
+.retraso-chip {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--warn);
+  background: rgba(217, 119, 6, 0.1);
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid rgba(217, 119, 6, 0.25);
+}
+.retraso-chip--zero {
+  color: var(--green);
+  background: rgba(22, 163, 74, 0.08);
+  border-color: rgba(22, 163, 74, 0.2);
+}
 </style>

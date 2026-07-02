@@ -18,8 +18,12 @@ export interface CriterionResult {
 }
 
 export interface AggregatedResult {
-  totalSobrecosto: number
+  // Fijo + ambas → se suman al CAPEX
+  totalSobrecostoFijo: number
   capexTotal: number
+  // Probabilidad → caja separada de riesgo de retraso
+  totalRetraso: number
+  totalRetrasoMeses: number
   breakdown: CriterionResult[]
 }
 

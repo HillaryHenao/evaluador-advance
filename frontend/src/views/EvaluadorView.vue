@@ -14,9 +14,21 @@ const results = computed(() => evaluateCriteria(store.criterionValues, {
   kWp: store.kWp,
 }))
 
-const fijoResults = computed(() =>
-  results.value.filter(r => r.category === 'fijo' || r.category === 'ambas'),
-)
+const FIJO_ORDER = [
+  'distancia_red', 'distancia_via',
+  'corte', 'lleno', 'disposicion_movimiento',
+  'nivel_tension', 'cluster',
+  'obras_hidraulicas', 'aprovechamiento_forestal',
+]
+
+const fijoResults = computed(() => {
+  const items = results.value.filter(r => r.category === 'fijo' || r.category === 'ambas')
+  return items.slice().sort((a, b) => {
+    const ai = FIJO_ORDER.indexOf(a.id)
+    const bi = FIJO_ORDER.indexOf(b.id)
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
+  })
+})
 
 const probabilidadResults = computed(() =>
   results.value.filter(r => r.category === 'probabilidad'),
