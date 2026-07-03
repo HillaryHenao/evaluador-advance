@@ -73,15 +73,20 @@ function meses(sobrecosto: number): number {
 
       <div v-for="item in retrasoBreakdown" :key="item.id" class="retraso-row">
         <span class="retraso-row-label">{{ item.label }}</span>
-        <span class="retraso-row-months">{{ meses(item.sobrecosto) }} mes{{ meses(item.sobrecosto) !== 1 ? 'es' : '' }}</span>
+        <span class="retraso-row-months" v-if="item.riskType === 'meses'">
+          {{ meses(item.sobrecosto) }} mes{{ meses(item.sobrecosto) !== 1 ? 'es' : '' }}
+        </span>
+        <span class="retraso-row-months" v-else>{{ formatCOP(item.sobrecosto) }}</span>
       </div>
 
       <div v-if="retrasoBreakdown.length > 0" class="retraso-total">
-        <div class="retraso-total-months">
+        <div class="retraso-total-months" v-if="store.aggregated.totalRetraso > 0">
           <span class="retraso-months-num">{{ store.aggregated.totalRetrasoMeses }}</span>
           <span class="retraso-months-label">meses de retraso estimado</span>
         </div>
-        <div class="retraso-total-cost">{{ formatCOP(store.aggregated.totalRetraso) }}</div>
+        <div class="retraso-total-cost">
+          {{ formatCOP(store.aggregated.totalRetraso + store.aggregated.totalRiesgoCosto) }}
+        </div>
         <div class="retraso-note">No incluido en el CAPEX</div>
       </div>
     </div>

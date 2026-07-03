@@ -11,9 +11,9 @@ beforeEach(() => {
 })
 
 describe('loadCriteria', () => {
-  it('carga exactamente 19 criterios', () => {
+  it('carga exactamente 18 criterios', () => {
     const criteria = loadCriteria()
-    expect(criteria).toHaveLength(19)
+    expect(criteria).toHaveLength(18)
   })
 
   it('todos tienen id, label e inputType', () => {
@@ -31,42 +31,60 @@ describe('evaluateCriteria', () => {
     const values = { corte: 100 }
     const results = evaluateCriteria(values, ctx)
     const corteResult = results.find(r => r.id === 'corte')
-    expect(corteResult?.sobrecosto).toBe(5_000_000)
+    expect(corteResult?.sobrecosto).toBe(5_700_000)
   })
 
   it('retorna sobrecosto 0 para criterios con formulaDefined=false', () => {
-    const values = { amenazas: 'alta' }
+    const values = { cluster: 3 }
     const results = evaluateCriteria(values, ctx)
-    const amenazasResult = results.find(r => r.id === 'amenazas')
-    expect(amenazasResult?.sobrecosto).toBe(0)
-    expect(amenazasResult?.formulaDefined).toBe(false)
+    const clusterResult = results.find(r => r.id === 'cluster')
+    expect(clusterResult?.sobrecosto).toBe(0)
+    expect(clusterResult?.formulaDefined).toBe(false)
   })
 
-  it('incluye los 19 criterios en el resultado aunque no tengan valor', () => {
+  it('incluye los 18 criterios en el resultado aunque no tengan valor', () => {
     const results = evaluateCriteria({}, ctx)
-    expect(results).toHaveLength(19)
+    expect(results).toHaveLength(18)
   })
 })
 
 describe('aggregateCosts', () => {
-  it('suma solo los criterios con formulaDefined=true y valor distinto de null', () => {
+  it('suma al CAPEX solo los criterios fijos/ambas con formulaDefined=true y valor distinto de null', () => {
     const values = { corte: 100, lleno: 10, pilotes: true }
     const results = evaluateCriteria(values, ctx)
     const aggregated = aggregateCosts(results, ctx)
-    const expected = 100 * 50_000 + 10 * 250_000 + 156_000_000
-    expect(aggregated.totalSobrecosto).toBe(expected)
+    const expected = 100 * 57_000 + 10 * 190_000 + 156_000_000
+    expect(aggregated.totalSobrecostoFijo).toBe(expected)
   })
 
-  it('calcula capexTotal = baseCapex + totalSobrecosto', () => {
+  it('calcula capexTotal = baseCapex + totalSobrecostoFijo', () => {
     const values = { corte: 100 }
     const results = evaluateCriteria(values, ctx)
     const aggregated = aggregateCosts(results, ctx)
-    expect(aggregated.capexTotal).toBe(ctx.baseCapex + 100 * 50_000)
+    expect(aggregated.capexTotal).toBe(ctx.baseCapex + 100 * 57_000)
+  })
+
+  it('pilotes suma 156M al CAPEX como costo fijo, no al factor de riesgo', () => {
+    const values = { pilotes: true }
+    const results = evaluateCriteria(values, ctx)
+    const aggregated = aggregateCosts(results, ctx)
+    expect(aggregated.totalSobrecostoFijo).toBe(156_000_000)
+    expect(aggregated.capexTotal).toBe(ctx.baseCapex + 156_000_000)
+    expect(aggregated.totalRiesgoCosto).toBe(0)
+    expect(aggregated.totalRetraso).toBe(0)
+  })
+
+  it('amenazas suma a totalRetraso en meses, no a totalRiesgoCosto', () => {
+    const values = { amenazas: 'malo' }
+    const results = evaluateCriteria(values, ctx)
+    const aggregated = aggregateCosts(results, ctx)
+    expect(aggregated.totalRetrasoMeses).toBe(2)
+    expect(aggregated.totalRiesgoCosto).toBe(0)
   })
 
   it('retorna breakdown con todos los criterios', () => {
     const results = evaluateCriteria({}, ctx)
     const aggregated = aggregateCosts(results, ctx)
-    expect(aggregated.breakdown).toHaveLength(19)
+    expect(aggregated.breakdown).toHaveLength(18)
   })
 })

@@ -29,6 +29,51 @@ def _get_nivel_tension(project_id: int) -> Optional[str]:
         return None
 
 
+# Estados de entities_coexistence.status que se consideran resueltos (sin sobrecosto)
+_COEXISTENCIA_RESUELTA = {'approved', 'not_applicable'}
+
+_ESTADO_LABELS = {
+    'approved': 'Aprobado',
+    'pending': 'Pendiente',
+    'sent': 'Enviado',
+    'communication': 'En comunicación',
+    'not_applicable': 'No aplica',
+}
+
+
+def _get_coexistencias(project_id: int) -> tuple[bool, list[dict]]:
+    """Consulta solicitudes de coexistencia en requestsdb (entities_coexistence + entities_operator).
+    Retorna (aplica_sobrecosto, detalle) — aplica_sobrecosto es True si alguna solicitud
+    está en un estado distinto de resuelto/aprobado."""
+    db2_url = os.environ.get('DATABASE_URL2') or os.environ.get('DATABASE_URL')
+    try:
+        conn = _connect(db2_url)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """SELECT c.status, o.name AS operator_name
+                       FROM entities_coexistence c
+                       LEFT JOIN entities_operator o ON o.id = c.operator_id
+                       WHERE c.project_id = %s
+                       ORDER BY o.name""",
+                    (str(project_id),),
+                )
+                rows = cur.fetchall()
+                detalle = [
+                    {
+                        'entidad': r['operator_name'] or 'Desconocido',
+                        'estado': _ESTADO_LABELS.get(r['status'], r['status']),
+                    }
+                    for r in rows
+                ]
+                aplica_sobrecosto = any(r['status'] not in _COEXISTENCIA_RESUELTA for r in rows)
+                return aplica_sobrecosto, detalle
+        finally:
+            conn.close()
+    except Exception:
+        return False, []
+
+
 def get_terrain_data(code: str) -> Optional[dict]:
     """Fetch terrain data from PostgreSQL. Returns None if terrain not found."""
     database_url = os.environ['DATABASE_URL']
@@ -121,18 +166,7 @@ def get_terrain_data(code: str) -> Optional[dict]:
                           AND vf.name = 'CAR'
                           AND vf.value IS NOT NULL
                         ORDER BY vf.id DESC LIMIT 1
-                    )                                           AS car_raw,
-
-                    -- Coexistencias: ANH o ANM con "se registra"
-                    (
-                        SELECT
-                            CASE WHEN vf.value ILIKE 'se registra%%' THEN TRUE ELSE FALSE END
-                        FROM validation_field vf
-                        WHERE (vf.project_id = p.id OR vf.terrain_id = t.id)
-                          AND vf.name IN ('ANH', 'ANM')
-                          AND vf.value IS NOT NULL
-                        ORDER BY vf.id DESC LIMIT 1
-                    )                                           AS coexistencias
+                    )                                           AS car_raw
 
                 FROM termsheet_terrain t
                 JOIN minifarm_project p ON p.terrain_id = t.id
@@ -150,6 +184,12 @@ def get_terrain_data(code: str) -> Optional[dict]:
 
     d = dict(row)
     project_id: int = d.pop('project_id')
+
+    # municipio: derivado del nombre del proyecto "{CODIGO}_{MUNICIPIO}_{ZONA}"
+    # (territorial_city.name puede estar mal asignado en el terreno). Cae a tc.name si no matchea el patrón.
+    name_parts = (d.get('name') or '').split('_')
+    if len(name_parts) >= 3:
+        d['municipality'] = name_parts[-2].replace('-', ' ').title()
 
     # nivel_tension — viene de requestsdb; normalizar a '13.8kV', '34.5kV', '115kV'
     tension_raw = _get_nivel_tension(project_id) or ''
@@ -213,5 +253,9 @@ def get_terrain_data(code: str) -> Optional[dict]:
         d['aprovechamiento_forestal'] = 'car_0.1'
     else:
         d['aprovechamiento_forestal'] = None
+
+    # coexistencias: solicitudes en requestsdb (entities_coexistence).
+    # Sin registro o todas resueltas/aprobadas → False; alguna en otro estado → True
+    d['coexistencias'], d['coexistencias_detalle'] = _get_coexistencias(project_id)
 
     return d

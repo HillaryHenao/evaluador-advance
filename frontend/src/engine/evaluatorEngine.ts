@@ -41,6 +41,7 @@ export function evaluateCriteria(
       formulaDefined: criterion.formulaDefined,
       fromDb: criterion.dataSource === 'db',
       category: criterion.category,
+      riskType: criterion.riskType,
     }
   })
 }
@@ -56,7 +57,11 @@ export function aggregateCosts(
     .reduce((acc, r) => acc + r.sobrecosto, 0)
 
   const totalRetraso = active
-    .filter(r => r.category === 'probabilidad')
+    .filter(r => r.category === 'probabilidad' && r.riskType === 'meses')
+    .reduce((acc, r) => acc + r.sobrecosto, 0)
+
+  const totalRiesgoCosto = active
+    .filter(r => r.category === 'probabilidad' && r.riskType === 'costo')
     .reduce((acc, r) => acc + r.sobrecosto, 0)
 
   return {
@@ -64,6 +69,7 @@ export function aggregateCosts(
     capexTotal: context.baseCapex + totalSobrecostoFijo,
     totalRetraso,
     totalRetrasoMeses: totalRetraso / COSTO_POR_MES,
+    totalRiesgoCosto,
     breakdown: results,
   }
 }

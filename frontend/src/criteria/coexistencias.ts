@@ -6,10 +6,12 @@ const coexistencias: CriterionModule = {
   inputType: 'toggle',
   dataSource: 'db',
   dbField: 'coexistencias',
-  formulaDefined: false,
+  formulaDefined: true,
   category: 'probabilidad',
-  computeCost(_value: CriterionValue, _context: EvalContext): number {
-    return 0
+  riskType: 'costo',
+  computeCost(value: CriterionValue, _context: EvalContext): number {
+    if (value !== true) return 0
+    return 60_000_000
   },
 }
 

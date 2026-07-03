@@ -7,6 +7,10 @@ export interface EvalContext {
 
 export type CriterionCategory = 'fijo' | 'probabilidad' | 'ambas'
 
+// Solo aplica a category 'probabilidad': 'meses' se traduce a tiempo de retraso,
+// 'costo' es un monto estipulado fijo que no se convierte a meses.
+export type RiskType = 'meses' | 'costo'
+
 export interface CriterionResult {
   id: string
   label: string
@@ -15,15 +19,17 @@ export interface CriterionResult {
   formulaDefined: boolean
   fromDb: boolean
   category: CriterionCategory
+  riskType?: RiskType
 }
 
 export interface AggregatedResult {
   // Fijo + ambas → se suman al CAPEX
   totalSobrecostoFijo: number
   capexTotal: number
-  // Probabilidad → caja separada de riesgo de retraso
+  // Probabilidad → caja separada de factor de riesgo (meses + costo estipulado)
   totalRetraso: number
   totalRetrasoMeses: number
+  totalRiesgoCosto: number
   breakdown: CriterionResult[]
 }
 
@@ -42,6 +48,7 @@ export interface CriterionModule {
   options?: SelectOption[]
   formulaDefined: boolean
   category: CriterionCategory
+  riskType?: RiskType
   computeCost: (value: CriterionValue, context: EvalContext) => number
 }
 
@@ -59,6 +66,12 @@ export interface TerrainData {
   servidumbre: string | null
   aprovechamiento_forestal: string | null
   coexistencias: boolean | null
+  coexistencias_detalle: CoexistenciaDetalle[] | null
+}
+
+export interface CoexistenciaDetalle {
+  entidad: string
+  estado: string
 }
 
 export interface AuthUser {

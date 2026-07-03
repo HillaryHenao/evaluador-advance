@@ -13,6 +13,7 @@ const amenazas: CriterionModule = {
   ],
   formulaDefined: true,
   category: 'probabilidad',
+  riskType: 'meses',
   computeCost(value: CriterionValue, _context: EvalContext): number {
     if (value === 'medio') return 1 * COSTO_POR_MES
     if (value === 'malo') return 2 * COSTO_POR_MES

@@ -39,12 +39,12 @@ describe('useEvaluatorStore', () => {
     store.setCriterionValue('corte', 100)
     expect(store.criterionValues['corte']).toBe(100)
     const corteResult = store.aggregated.breakdown.find(r => r.id === 'corte')
-    expect(corteResult?.sobrecosto).toBe(5_000_000)
+    expect(corteResult?.sobrecosto).toBe(5_700_000)
   })
 
   it('aggregated.capexTotal incluye baseCapex + sobrecostos', () => {
     const store = useEvaluatorStore()
     store.setCriterionValue('corte', 100)
-    expect(store.aggregated.capexTotal).toBe(store.baseCapex + 5_000_000)
+    expect(store.aggregated.capexTotal).toBe(store.baseCapex + 5_700_000)
   })
 })

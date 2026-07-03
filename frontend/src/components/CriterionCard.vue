@@ -21,8 +21,13 @@ function formatCOP(value: number): string {
 }
 
 const delayMonths = computed(() => {
-  if (props.result.category !== 'probabilidad') return 0
+  if (props.result.category !== 'probabilidad' || props.result.riskType !== 'meses') return 0
   return Math.round(props.result.sobrecosto / COSTO_POR_MES)
+})
+
+const coexistenciasDetalle = computed(() => {
+  if (props.result.id !== 'coexistencias') return []
+  return store.terrainData?.coexistencias_detalle ?? []
 })
 
 function handleInput(event: Event) {
@@ -103,12 +108,30 @@ function handleToggle(event: Event) {
       </span>
     </div>
 
-    <!-- Criterio probabilidad: muestra meses de retraso -->
-    <div class="card-cost card-cost--retraso" v-if="result.formulaDefined && result.category === 'probabilidad' && result.value !== null">
+    <!-- Criterio probabilidad tipo meses: muestra retraso estimado -->
+    <div class="card-cost card-cost--retraso" v-if="result.formulaDefined && result.category === 'probabilidad' && result.riskType === 'meses' && result.value !== null">
       <span class="cost-label">Retraso estimado</span>
       <span class="retraso-chip" :class="{ 'retraso-chip--zero': delayMonths === 0 }">
         {{ delayMonths === 0 ? 'Sin retraso' : `${delayMonths} mes${delayMonths !== 1 ? 'es' : ''}` }}
       </span>
+    </div>
+
+    <!-- Criterio probabilidad tipo costo: muestra monto estipulado -->
+    <div class="card-cost card-cost--retraso" v-if="result.formulaDefined && result.category === 'probabilidad' && result.riskType === 'costo' && result.value !== null">
+      <span class="cost-label">Riesgo estipulado</span>
+      <span class="retraso-chip" :class="{ 'retraso-chip--zero': result.sobrecosto === 0 }">
+        {{ formatCOP(result.sobrecosto) }}
+      </span>
+    </div>
+
+    <!-- Coexistencias: detalle de entidades y estados -->
+    <div class="coexistencias-detalle" v-if="result.id === 'coexistencias' && coexistenciasDetalle.length > 0">
+      <div v-for="(item, idx) in coexistenciasDetalle" :key="idx" class="coexistencia-row">
+        <span class="coexistencia-entidad">{{ item.entidad }}</span>
+        <span class="coexistencia-estado" :class="{ 'coexistencia-estado--ok': item.estado === 'Aprobado' }">
+          {{ item.estado }}
+        </span>
+      </div>
     </div>
   </div>
 </template>
@@ -252,5 +275,34 @@ function handleToggle(event: Event) {
   color: var(--green);
   background: rgba(22, 163, 74, 0.08);
   border-color: rgba(22, 163, 74, 0.2);
+}
+
+.coexistencias-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--border);
+}
+.coexistencia-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+}
+.coexistencia-entidad { color: var(--text-mid); flex: 1; line-height: 1.3; }
+.coexistencia-estado {
+  font-weight: 700;
+  color: var(--warn);
+  background: rgba(217, 119, 6, 0.1);
+  padding: 0.1rem 0.4rem;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+.coexistencia-estado--ok {
+  color: var(--green);
+  background: rgba(22, 163, 74, 0.08);
 }
 </style>
