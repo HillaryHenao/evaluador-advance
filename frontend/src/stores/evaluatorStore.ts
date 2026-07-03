@@ -2,8 +2,9 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { fetchTerrainData } from '@/services/terrainService'
 import { loadCriteria, evaluateCriteria, aggregateCosts } from '@/engine/evaluatorEngine'
+import { calcularFinanzas } from '@/engine/financialEngine'
 import { useAuthStore } from '@/stores/authStore'
-import type { TerrainData, CriterionValue, AggregatedResult } from '@/types'
+import type { TerrainData, CriterionValue, AggregatedResult, FinancialResults } from '@/types'
 
 type CriterionValues = Record<string, CriterionValue>
 
@@ -15,6 +16,8 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
   const criterionValues = ref<CriterionValues>({})
   const baseCapex = ref(BASE_CAPEX_DEFAULT)
   const kWp = ref(KWP_DEFAULT)
+  const kVA = ref(1000)
+  const arriendoManual = ref<number | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -23,6 +26,19 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
   const aggregated = computed<AggregatedResult>(() => {
     const results = evaluateCriteria(criterionValues.value, context.value)
     return aggregateCosts(results, context.value)
+  })
+
+  const financialResults = computed<FinancialResults | null>(() => {
+    const produccionEspecifica = terrainData.value?.produccion_especifica
+    const arriendoAnual = arriendoManual.value ?? terrainData.value?.arriendo_anual
+    if (!produccionEspecifica || !arriendoAnual) return null
+    return calcularFinanzas({
+      capex: aggregated.value.capexTotal,
+      kWp: kWp.value,
+      kVA: kVA.value,
+      produccionEspecifica,
+      arriendoAnual,
+    })
   })
 
   async function fetchTerrain(code: string): Promise<void> {
@@ -60,7 +76,7 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
   }
 
   return {
-    terrainData, criterionValues, baseCapex, kWp,
-    loading, error, aggregated, fetchTerrain, setCriterionValue, reset,
+    terrainData, criterionValues, baseCapex, kWp, kVA, arriendoManual,
+    loading, error, aggregated, financialResults, fetchTerrain, setCriterionValue, reset,
   }
 })

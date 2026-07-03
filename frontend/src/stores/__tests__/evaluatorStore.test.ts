@@ -55,3 +55,18 @@ describe('useEvaluatorStore', () => {
     expect(store.aggregated.capexTotal).toBe(store.baseCapex + 5_700_000)
   })
 })
+
+describe('financialResults', () => {
+  it('es null si no hay producción específica ni arriendo cargados', () => {
+    const store = useEvaluatorStore()
+    expect(store.financialResults).toBeNull()
+  })
+
+  it('calcula TIR una vez cargados terrainData y kVA por defecto', async () => {
+    vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue(mockTerrain)
+    const store = useEvaluatorStore()
+    await store.fetchTerrain('COLCEST5')
+    expect(store.financialResults).not.toBeNull()
+    expect(store.financialResults?.tir).toBeGreaterThan(0)
+  })
+})
