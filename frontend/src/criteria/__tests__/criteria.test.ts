@@ -7,6 +7,7 @@ import propietario from '../propietario'
 import servidumbre from '../servidumbre'
 import cluster from '../cluster'
 import aprovechamientoForestal from '../aprovechamiento_forestal'
+import ocupacionCauce from '../ocupacion_cauce'
 import distanciaRed from '../distancia_red'
 import distanciaVia from '../distancia_via'
 
@@ -68,17 +69,21 @@ describe('propietario', () => {
 })
 
 describe('servidumbre', () => {
-  it('bueno no agrega sobrecosto', () => {
-    expect(servidumbre.computeCost('bueno', ctx)).toBe(0)
+  it('0 meses no agrega sobrecosto (aprobada o propia)', () => {
+    expect(servidumbre.computeCost(0, ctx)).toBe(0)
   })
-  it('medio agrega 60.000.000', () => {
-    expect(servidumbre.computeCost('medio', ctx)).toBe(60_000_000)
+  it('retorna 0 para valor nulo (aún sin definir manualmente)', () => {
+    expect(servidumbre.computeCost(null, ctx)).toBe(0)
   })
-  it('malo agrega 120.000.000', () => {
-    expect(servidumbre.computeCost('malo', ctx)).toBe(120_000_000)
+  it('calcula 60.000.000 por mes de retraso', () => {
+    expect(servidumbre.computeCost(1, ctx)).toBe(60_000_000)
+    expect(servidumbre.computeCost(3, ctx)).toBe(180_000_000)
   })
   it('es db_or_manual para permitir ajuste manual cuando no hay estado aprobado', () => {
     expect(servidumbre.dataSource).toBe('db_or_manual')
+  })
+  it('tiene riskType meses', () => {
+    expect(servidumbre.riskType).toBe('meses')
   })
 })
 
@@ -109,6 +114,19 @@ describe('aprovechamiento_forestal', () => {
   })
   it('otro estado agrega 200.000.000', () => {
     expect(aprovechamientoForestal.computeCost('otro', ctx)).toBe(200_000_000)
+  })
+})
+
+describe('ocupacion_cauce', () => {
+  it('false (No Requiere/Aprobado) no agrega sobrecosto', () => {
+    expect(ocupacionCauce.computeCost(false, ctx)).toBe(0)
+  })
+  it('true (cualquier otro estado) agrega 100.000.000', () => {
+    expect(ocupacionCauce.computeCost(true, ctx)).toBe(100_000_000)
+  })
+  it('tiene formulaDefined true y category fijo', () => {
+    expect(ocupacionCauce.formulaDefined).toBe(true)
+    expect(ocupacionCauce.category).toBe('fijo')
   })
 })
 

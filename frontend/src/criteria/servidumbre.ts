@@ -1,23 +1,19 @@
 import type { CriterionModule, CriterionValue, EvalContext } from '@/types'
+import { COSTO_POR_MES } from '@/engine/evaluatorEngine'
 
 const servidumbre: CriterionModule = {
   id: 'servidumbre',
   label: 'Servidumbre',
-  inputType: 'select',
+  inputType: 'number',
+  unit: 'meses de retraso',
   dataSource: 'db_or_manual',
   dbField: 'servidumbre',
-  options: [
-    { value: 'bueno', label: 'Bueno' },
-    { value: 'medio', label: 'Medio' },
-    { value: 'malo', label: 'Malo' },
-  ],
   formulaDefined: true,
   category: 'probabilidad',
-  riskType: 'costo',
+  riskType: 'meses',
   computeCost(value: CriterionValue, _context: EvalContext): number {
-    if (value === 'medio') return 60_000_000
-    if (value === 'malo') return 120_000_000
-    return 0
+    if (value === null || typeof value !== 'number' || value <= 0) return 0
+    return value * COSTO_POR_MES
   },
 }
 

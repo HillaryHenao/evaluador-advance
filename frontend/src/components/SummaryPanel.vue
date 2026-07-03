@@ -78,7 +78,7 @@ function meses(sobrecosto: number): number {
       <div v-for="item in retrasoBreakdown" :key="item.id" class="retraso-row">
         <span class="retraso-row-label">{{ item.label }}</span>
         <span class="retraso-row-months" v-if="item.riskType === 'meses'">
-          {{ meses(item.sobrecosto) }} mes{{ meses(item.sobrecosto) !== 1 ? 'es' : '' }}
+          {{ meses(item.sobrecosto) }} mes{{ meses(item.sobrecosto) !== 1 ? 'es' : '' }} · {{ formatCOP(item.sobrecosto) }}
         </span>
         <span class="retraso-row-months" v-else>{{ formatCOP(item.sobrecosto) }}</span>
       </div>

@@ -7,9 +7,9 @@ const amenazas: CriterionModule = {
   inputType: 'select',
   dataSource: 'manual',
   options: [
-    { value: 'bueno', label: 'Bueno — sin retraso' },
-    { value: 'medio', label: 'Medio — 1 mes de retraso' },
-    { value: 'malo', label: 'Malo — +2 meses de retraso' },
+    { value: 'bueno', label: 'Bueno — sin retraso ($0)' },
+    { value: 'medio', label: 'Medio — 1 mes de retraso ($60.000.000)' },
+    { value: 'malo', label: 'Malo — +2 meses de retraso ($120.000.000)' },
   ],
   formulaDefined: true,
   category: 'probabilidad',

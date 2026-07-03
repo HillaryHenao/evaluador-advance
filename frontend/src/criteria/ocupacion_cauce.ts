@@ -6,10 +6,11 @@ const ocupacionCauce: CriterionModule = {
   inputType: 'toggle',
   dataSource: 'db',
   dbField: 'ocupacion_cauce',
-  formulaDefined: false,
-  category: 'probabilidad',
-  computeCost(_value: CriterionValue, _context: EvalContext): number {
-    return 0
+  formulaDefined: true,
+  category: 'fijo',
+  computeCost(value: CriterionValue, _context: EvalContext): number {
+    if (value !== true) return 0
+    return 100_000_000
   },
 }
 

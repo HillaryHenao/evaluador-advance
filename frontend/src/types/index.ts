@@ -63,7 +63,8 @@ export interface TerrainData {
   cluster: number | null
   tipo_estructura: string | null
   ocupacion_cauce: boolean | null
-  servidumbre: string | null
+  ocupacion_cauce_detalle: string | null
+  servidumbre: number | null
   servidumbre_detalle: EstadoDetalle | null
   aprovechamiento_forestal: string | null
   aprovechamiento_forestal_detalle: ProyectoEstadoDetalle[] | null

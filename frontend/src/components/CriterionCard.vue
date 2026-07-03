@@ -40,6 +40,11 @@ const aprovechamientoDetalle = computed(() => {
   return store.terrainData?.aprovechamiento_forestal_detalle ?? []
 })
 
+const ocupacionCauceDetalle = computed(() => {
+  if (props.result.id !== 'ocupacion_cauce') return null
+  return store.terrainData?.ocupacion_cauce_detalle ?? null
+})
+
 function handleInput(event: Event) {
   const target = event.target as HTMLInputElement
   const raw = target.value
@@ -125,7 +130,7 @@ function handleToggle(event: Event) {
     <div class="card-cost card-cost--retraso" v-if="result.formulaDefined && result.category === 'probabilidad' && result.riskType === 'meses' && result.value !== null">
       <span class="cost-label">Retraso estimado</span>
       <span class="retraso-chip" :class="{ 'retraso-chip--zero': delayMonths === 0 }">
-        {{ delayMonths === 0 ? 'Sin retraso' : `${delayMonths} mes${delayMonths !== 1 ? 'es' : ''}` }}
+        {{ delayMonths === 0 ? 'Sin retraso' : `${delayMonths} mes${delayMonths !== 1 ? 'es' : ''} · ${formatCOP(result.sobrecosto)}` }}
       </span>
     </div>
 
@@ -166,6 +171,19 @@ function handleToggle(event: Event) {
           :class="{ 'coexistencia-estado--ok': item.estado === 'Exonerado' || item.estado === 'Solicitud aprobada' }"
         >
           {{ item.estado }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Ocupación de cauce: estado real desde BD -->
+    <div class="coexistencias-detalle" v-if="result.id === 'ocupacion_cauce' && ocupacionCauceDetalle">
+      <div class="coexistencia-row">
+        <span class="coexistencia-entidad">Estado en BD</span>
+        <span
+          class="coexistencia-estado"
+          :class="{ 'coexistencia-estado--ok': ocupacionCauceDetalle === 'No Requiere' || ocupacionCauceDetalle === 'Aprobado' || ocupacionCauceDetalle === 'Exonerado' }"
+        >
+          {{ ocupacionCauceDetalle }}
         </span>
       </div>
     </div>

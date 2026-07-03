@@ -169,7 +169,7 @@ def get_terrain_data(code: str) -> Optional[dict]:
                         ORDER BY vf.id DESC LIMIT 1
                     )                                           AS tipo_raw,
 
-                    -- Ocupación de cauce: valor + status exonerado
+                    -- Ocupación de cauce: valor + status de la MISMA fila
                     (
                         SELECT vf.value FROM validation_field vf
                         WHERE (vf.project_id = p.id OR vf.terrain_id = t.id)
@@ -181,39 +181,41 @@ def get_terrain_data(code: str) -> Optional[dict]:
                         SELECT vf.status FROM validation_field vf
                         WHERE (vf.project_id = p.id OR vf.terrain_id = t.id)
                           AND vf.name = 'Ocupación de cauce'
+                          AND (vf.value IS NOT NULL OR vf.status = 'exonerated')
                         ORDER BY vf.id DESC LIMIT 1
                     )                                           AS ocupacion_status,
 
-                    -- Servidumbre: primero validation_field, luego easements
-                    COALESCE(
-                        (
-                            SELECT vf.value FROM validation_field vf
-                            WHERE (vf.project_id = p.id OR vf.terrain_id = t.id)
-                              AND vf.name = 'Servidumbre'
-                              AND vf.value IS NOT NULL
-                            ORDER BY vf.id DESC LIMIT 1
-                        ),
-                        (
-                            SELECT
-                                CASE e.type
-                                    WHEN 'own'                THEN 'Propia'
-                                    WHEN 'public'             THEN 'Pública'
-                                    WHEN 'foreign'            THEN 'Ajena'
-                                    WHEN 'public_and_foreign' THEN 'Pública y Ajena'
-                                    ELSE e.type
-                                END
-                            FROM easements_easement e
-                            WHERE e.terrain_id = t.id
-                              AND e.character = 'electrical'
-                            LIMIT 1
-                        )
-                    )                                           AS servidumbre_raw,
+                    -- Servidumbre: primero validation_field (valor + status de la MISMA fila),
+                    -- si no hay registro cae a easements_easement (tipo + su propio status)
+                    (
+                        SELECT vf.value FROM validation_field vf
+                        WHERE (vf.project_id = p.id OR vf.terrain_id = t.id)
+                          AND vf.name = 'Servidumbre'
+                          AND vf.value IS NOT NULL
+                        ORDER BY vf.id DESC LIMIT 1
+                    )                                           AS servidumbre_vf_value,
                     (
                         SELECT vf.status FROM validation_field vf
                         WHERE (vf.project_id = p.id OR vf.terrain_id = t.id)
                           AND vf.name = 'Servidumbre'
+                          AND vf.value IS NOT NULL
                         ORDER BY vf.id DESC LIMIT 1
-                    )                                           AS servidumbre_status,
+                    )                                           AS servidumbre_vf_status,
+                    (
+                        SELECT e.type FROM easements_easement e
+                        WHERE e.terrain_id = t.id AND e.character = 'electrical'
+                        ORDER BY e.id DESC LIMIT 1
+                    )                                           AS servidumbre_easement_type,
+                    (
+                        SELECT e.foreign_status FROM easements_easement e
+                        WHERE e.terrain_id = t.id AND e.character = 'electrical'
+                        ORDER BY e.id DESC LIMIT 1
+                    )                                           AS servidumbre_easement_foreign_status,
+                    (
+                        SELECT e.public_status FROM easements_easement e
+                        WHERE e.terrain_id = t.id AND e.character = 'electrical'
+                        ORDER BY e.id DESC LIMIT 1
+                    )                                           AS servidumbre_easement_public_status,
 
                     -- Número de árboles
                     (
@@ -267,46 +269,73 @@ def get_terrain_data(code: str) -> Optional[dict]:
     else:
         d['tipo_estructura'] = None
 
-    # ocupacion_cauce: 'No Requiere' → False, 'Requiere' → True, exonerated → False
+    # ocupacion_cauce: 'No Requiere' o 'Aprobado' -> False (sin sobrecosto).
+    # Cualquier otro estado (Pendiente, Requiere, evidencia sin resolver, etc.) -> True (+100M)
+    _OCUPACION_RESUELTO = {'no requiere', 'aprobado', 'exonerado'}
     ocupacion_raw = d.pop('ocupacion_raw', None)
     ocupacion_status = d.pop('ocupacion_status', None)
-    if ocupacion_status == 'exonerated':
-        d['ocupacion_cauce'] = False
-    elif ocupacion_raw is not None:
-        txt = ocupacion_raw.lower()
-        d['ocupacion_cauce'] = 'requiere' in txt and 'no' not in txt
-    else:
+    raw = (ocupacion_raw or '').strip()
+    if not raw and ocupacion_status == 'exonerated':
+        raw = 'Exonerado'
+    if raw.startswith('/media/') or raw.startswith('validation/'):
+        raw = 'Evidencia sin resolver'
+    d['ocupacion_cauce_detalle'] = raw or None
+    if not raw:
         d['ocupacion_cauce'] = None
+    else:
+        d['ocupacion_cauce'] = raw.lower() not in _OCUPACION_RESUELTO
 
-    # servidumbre: tipo (own/public/foreign/public_and_foreign) + estado de resolución.
-    # Propia, o Pública/Ajena ya aprobada -> 'bueno' (sin sobrecosto). Cualquier otro caso
-    # requiere que el usuario elija manualmente 'medio' o 'malo' en el frontend.
-    servidumbre_raw = (d.pop('servidumbre_raw', None) or '').lower()
-    servidumbre_status = d.pop('servidumbre_status', None)
+    # servidumbre: tipo + estado de resolución, tomados de la MISMA fuente para que no se
+    # crucen datos de registros distintos. Primero validation_field ('Servidumbre'); si no
+    # hay valor registrado ahí, cae a easements_easement (con su propio status por tipo).
     _TIPO_LABELS = {'own': 'Propia', 'public': 'Pública', 'foreign': 'Ajena', 'public_and_foreign': 'Pública y Ajena'}
-    if 'pública y ajena' in servidumbre_raw or 'publica y ajena' in servidumbre_raw:
-        tipo = 'public_and_foreign'
-    elif 'propia' in servidumbre_raw:
-        tipo = 'own'
-    elif 'pública' in servidumbre_raw or 'publica' in servidumbre_raw:
-        tipo = 'public'
-    elif 'ajena' in servidumbre_raw:
-        tipo = 'foreign'
+    _EASEMENT_STATUS_LABELS = {
+        'validation': 'En validación',
+        'negotiation': 'En negociación',
+        'not_viable': 'No viable',
+        'signed': 'Firmada',
+        'pending': 'Pendiente',
+        'initial': 'Inicial',
+        'obtained_license': 'Licencia obtenida',
+    }
+
+    vf_value = (d.pop('servidumbre_vf_value', None) or '').lower()
+    vf_status = d.pop('servidumbre_vf_status', None)
+    easement_type = d.pop('servidumbre_easement_type', None)
+    easement_foreign_status = d.pop('servidumbre_easement_foreign_status', None)
+    easement_public_status = d.pop('servidumbre_easement_public_status', None)
+
+    if vf_value:
+        if 'pública y ajena' in vf_value or 'publica y ajena' in vf_value:
+            tipo = 'public_and_foreign'
+        elif 'propia' in vf_value:
+            tipo = 'own'
+        elif 'pública' in vf_value or 'publica' in vf_value:
+            tipo = 'public'
+        elif 'ajena' in vf_value:
+            tipo = 'foreign'
+        else:
+            tipo = None
+        resuelto = tipo == 'own' or vf_status == 'approved'
+        estado_label = _VALIDATION_STATUS_LABELS.get(vf_status, vf_status) if vf_status else 'Sin registro'
+    elif easement_type:
+        tipo = easement_type
+        if tipo == 'own':
+            resuelto = True
+            estado_label = 'N/A'
+        elif tipo == 'foreign':
+            resuelto = easement_foreign_status == 'signed'
+            estado_label = _EASEMENT_STATUS_LABELS.get(easement_foreign_status, easement_foreign_status) if easement_foreign_status else 'Sin registro'
+        else:  # public
+            resuelto = easement_public_status == 'obtained_license'
+            estado_label = _EASEMENT_STATUS_LABELS.get(easement_public_status, easement_public_status) if easement_public_status else 'Sin registro'
     else:
         tipo = None
+        resuelto = False
+        estado_label = None
 
-    if tipo == 'own' or (tipo is not None and servidumbre_status == 'approved'):
-        d['servidumbre'] = 'bueno'
-    else:
-        d['servidumbre'] = None
-
-    d['servidumbre_detalle'] = (
-        {
-            'tipo': _TIPO_LABELS.get(tipo, tipo),
-            'estado': _VALIDATION_STATUS_LABELS.get(servidumbre_status, servidumbre_status) if servidumbre_status else 'Sin registro',
-        }
-        if tipo else None
-    )
+    d['servidumbre'] = 0 if resuelto else None
+    d['servidumbre_detalle'] = {'tipo': _TIPO_LABELS.get(tipo, tipo), 'estado': estado_label} if tipo else None
 
     # aprovechamiento_forestal: estado por proyecto (el licenciamiento es por terreno pero
     # en la práctica puede haber proyectos con estados distintos — caso particular)
