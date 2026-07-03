@@ -4,6 +4,7 @@ import AppHeader from '@/components/AppHeader.vue'
 import TerrainSearch from '@/components/TerrainSearch.vue'
 import CriterionCard from '@/components/CriterionCard.vue'
 import SummaryPanel from '@/components/SummaryPanel.vue'
+import FinancialResultsPanel from '@/components/FinancialResultsPanel.vue'
 import { useEvaluatorStore } from '@/stores/evaluatorStore'
 import { evaluateCriteria } from '@/engine/evaluatorEngine'
 
@@ -67,6 +68,7 @@ const probabilidadResults = computed(() =>
         </div>
       </main>
       <SummaryPanel />
+      <FinancialResultsPanel />
     </div>
   </div>
 </template>
