@@ -5,11 +5,13 @@ const numeroArboles: CriterionModule = {
   label: 'Número de árboles',
   inputType: 'number',
   unit: 'árboles',
-  dataSource: 'manual',
-  formulaDefined: false,
-  category: 'probabilidad',
-  computeCost(_value: CriterionValue, _context: EvalContext): number {
-    return 0
+  dataSource: 'db',
+  dbField: 'numero_arboles',
+  formulaDefined: true,
+  category: 'fijo',
+  computeCost(value: CriterionValue, _context: EvalContext): number {
+    if (value === null || typeof value !== 'number') return 0
+    return value * 142_500
   },
 }
 

@@ -30,6 +30,16 @@ const coexistenciasDetalle = computed(() => {
   return store.terrainData?.coexistencias_detalle ?? []
 })
 
+const servidumbreDetalle = computed(() => {
+  if (props.result.id !== 'servidumbre') return null
+  return store.terrainData?.servidumbre_detalle ?? null
+})
+
+const aprovechamientoDetalle = computed(() => {
+  if (props.result.id !== 'aprovechamiento_forestal') return []
+  return store.terrainData?.aprovechamiento_forestal_detalle ?? []
+})
+
 function handleInput(event: Event) {
   const target = event.target as HTMLInputElement
   const raw = target.value
@@ -102,8 +112,11 @@ function handleToggle(event: Event) {
 
     <!-- Criterio fijo: muestra COP -->
     <div class="card-cost" v-if="result.formulaDefined && result.category !== 'probabilidad'">
-      <span class="cost-label">Sobrecosto</span>
-      <span class="cost-value" :class="{ 'cost-value--zero': result.sobrecosto === 0 }">
+      <span class="cost-label">{{ result.sobrecosto < 0 ? 'Ahorro' : 'Sobrecosto' }}</span>
+      <span
+        class="cost-value"
+        :class="{ 'cost-value--zero': result.sobrecosto === 0, 'cost-value--ahorro': result.sobrecosto < 0 }"
+      >
         {{ formatCOP(result.sobrecosto) }}
       </span>
     </div>
@@ -129,6 +142,29 @@ function handleToggle(event: Event) {
       <div v-for="(item, idx) in coexistenciasDetalle" :key="idx" class="coexistencia-row">
         <span class="coexistencia-entidad">{{ item.entidad }}</span>
         <span class="coexistencia-estado" :class="{ 'coexistencia-estado--ok': item.estado === 'Aprobado' }">
+          {{ item.estado }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Servidumbre: detalle de tipo y estado desde BD -->
+    <div class="coexistencias-detalle" v-if="result.id === 'servidumbre' && servidumbreDetalle">
+      <div class="coexistencia-row">
+        <span class="coexistencia-entidad">{{ servidumbreDetalle.tipo }}</span>
+        <span class="coexistencia-estado" :class="{ 'coexistencia-estado--ok': servidumbreDetalle.estado === 'Aprobada' }">
+          {{ servidumbreDetalle.estado }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Aprovechamiento forestal: detalle por proyecto (puede variar entre proyectos del mismo terreno) -->
+    <div class="coexistencias-detalle" v-if="result.id === 'aprovechamiento_forestal' && aprovechamientoDetalle.length > 0">
+      <div v-for="(item, idx) in aprovechamientoDetalle" :key="idx" class="coexistencia-row">
+        <span class="coexistencia-entidad">{{ item.proyecto }}</span>
+        <span
+          class="coexistencia-estado"
+          :class="{ 'coexistencia-estado--ok': item.estado === 'Exonerado' || item.estado === 'Solicitud aprobada' }"
+        >
           {{ item.estado }}
         </span>
       </div>
@@ -260,6 +296,7 @@ function handleToggle(event: Event) {
 .cost-label { font-size: 0.75rem; color: var(--muted); font-weight: 600; }
 .cost-value { font-size: 0.88rem; font-weight: 700; color: var(--purple); }
 .cost-value--zero { color: var(--muted); font-weight: 400; }
+.cost-value--ahorro { color: var(--green); }
 
 .card-cost--retraso { border-top-color: rgba(217, 119, 6, 0.2); }
 .retraso-chip {

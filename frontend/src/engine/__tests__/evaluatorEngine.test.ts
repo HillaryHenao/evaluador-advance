@@ -35,11 +35,11 @@ describe('evaluateCriteria', () => {
   })
 
   it('retorna sobrecosto 0 para criterios con formulaDefined=false', () => {
-    const values = { cluster: 3 }
+    const values = { obras_hidraulicas: 'alta' }
     const results = evaluateCriteria(values, ctx)
-    const clusterResult = results.find(r => r.id === 'cluster')
-    expect(clusterResult?.sobrecosto).toBe(0)
-    expect(clusterResult?.formulaDefined).toBe(false)
+    const result = results.find(r => r.id === 'obras_hidraulicas')
+    expect(result?.sobrecosto).toBe(0)
+    expect(result?.formulaDefined).toBe(false)
   })
 
   it('incluye los 18 criterios en el resultado aunque no tengan valor', () => {

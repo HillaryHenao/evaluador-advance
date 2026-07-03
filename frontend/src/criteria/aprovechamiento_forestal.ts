@@ -7,15 +7,16 @@ const aprovechamientoForestal: CriterionModule = {
   dataSource: 'db',
   dbField: 'aprovechamiento_forestal',
   options: [
-    { value: 'exonerado', label: 'Exonerado' },
-    { value: 'car_0.9', label: 'CAR nivel 0.9' },
-    { value: 'car_0.8', label: 'CAR nivel 0.8' },
-    { value: 'car_0.6', label: 'CAR nivel 0.6' },
-    { value: 'car_0.1', label: 'CAR nivel 0.1' },
+    { value: 'visita', label: 'Visita' },
+    { value: 'radicada', label: 'Solicitud radicada' },
+    { value: 'otro', label: 'Otro estado pendiente' },
   ],
-  formulaDefined: false,
-  category: 'ambas',
-  computeCost(_value: CriterionValue, _context: EvalContext): number {
+  formulaDefined: true,
+  category: 'fijo',
+  computeCost(value: CriterionValue, _context: EvalContext): number {
+    if (value === 'visita') return 20_000_000
+    if (value === 'radicada') return 150_000_000
+    if (value === 'otro') return 200_000_000
     return 0
   },
 }

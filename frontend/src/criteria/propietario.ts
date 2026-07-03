@@ -6,15 +6,16 @@ const propietario: CriterionModule = {
   inputType: 'select',
   dataSource: 'manual',
   options: [
-    { value: '5', label: '★★★★★' },
-    { value: '4', label: '★★★★' },
-    { value: '3', label: '★★★' },
-    { value: '2', label: '★★' },
-    { value: '1', label: '★' },
+    { value: 'bueno', label: 'Bueno' },
+    { value: 'medio', label: 'Medio' },
+    { value: 'malo', label: 'Malo' },
   ],
-  formulaDefined: false,
+  formulaDefined: true,
   category: 'probabilidad',
-  computeCost(_value: CriterionValue, _context: EvalContext): number {
+  riskType: 'costo',
+  computeCost(value: CriterionValue, _context: EvalContext): number {
+    if (value === 'medio') return 30_000_000
+    if (value === 'malo') return 60_000_000
     return 0
   },
 }

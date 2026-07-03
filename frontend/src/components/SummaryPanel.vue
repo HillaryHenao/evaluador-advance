@@ -6,16 +6,18 @@ import { COSTO_POR_MES } from '@/engine/evaluatorEngine'
 const store = useEvaluatorStore()
 
 function formatCOP(value: number): string {
-  if (value >= 1_000_000_000)
-    return `$${(value / 1_000_000_000).toFixed(2).replace('.', ',')} B`
-  if (value >= 1_000_000)
-    return `$${(value / 1_000_000).toFixed(1).replace('.', ',')} M`
+  const sign = value < 0 ? '-' : ''
+  const abs = Math.abs(value)
+  if (abs >= 1_000_000_000)
+    return `${sign}$${(abs / 1_000_000_000).toFixed(2).replace('.', ',')} B`
+  if (abs >= 1_000_000)
+    return `${sign}$${(abs / 1_000_000).toFixed(1).replace('.', ',')} M`
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value)
 }
 
 const fijoBreakdown = computed(() =>
   store.aggregated.breakdown.filter(
-    r => (r.category === 'fijo' || r.category === 'ambas') && r.formulaDefined && r.value !== null && r.sobrecosto > 0,
+    r => (r.category === 'fijo' || r.category === 'ambas') && r.formulaDefined && r.value !== null && r.sobrecosto !== 0,
   ),
 )
 
@@ -48,7 +50,9 @@ function meses(sobrecosto: number): number {
 
     <div v-for="item in fijoBreakdown" :key="item.id" class="summary-row">
       <span class="summary-row-label">{{ item.label }}</span>
-      <span class="summary-row-value">{{ formatCOP(item.sobrecosto) }}</span>
+      <span class="summary-row-value" :class="{ 'summary-row-value--ahorro': item.sobrecosto < 0 }">
+        {{ formatCOP(item.sobrecosto) }}
+      </span>
     </div>
 
     <div v-if="fijoBreakdown.length > 0" class="summary-divider" />
@@ -134,6 +138,7 @@ function meses(sobrecosto: number): number {
 .summary-row--spaced { margin: 0.1rem 0; }
 .summary-row-label { color: var(--text-mid); font-weight: 500; flex: 1; padding-right: 0.5rem; line-height: 1.35; }
 .summary-row-value { color: var(--purple); font-weight: 700; white-space: nowrap; }
+.summary-row-value--ahorro { color: var(--green); }
 
 .summary-divider { height: 1px; background: var(--border); margin: 0.2rem 0; }
 

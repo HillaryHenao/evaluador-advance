@@ -64,13 +64,26 @@ export interface TerrainData {
   tipo_estructura: string | null
   ocupacion_cauce: boolean | null
   servidumbre: string | null
+  servidumbre_detalle: EstadoDetalle | null
   aprovechamiento_forestal: string | null
+  aprovechamiento_forestal_detalle: ProyectoEstadoDetalle[] | null
   coexistencias: boolean | null
   coexistencias_detalle: CoexistenciaDetalle[] | null
+  numero_arboles: number | null
 }
 
 export interface CoexistenciaDetalle {
   entidad: string
+  estado: string
+}
+
+export interface ProyectoEstadoDetalle {
+  proyecto: string
+  estado: string
+}
+
+export interface EstadoDetalle {
+  tipo: string
   estado: string
 }
 

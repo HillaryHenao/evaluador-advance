@@ -4,17 +4,19 @@ const servidumbre: CriterionModule = {
   id: 'servidumbre',
   label: 'Servidumbre',
   inputType: 'select',
-  dataSource: 'db',
+  dataSource: 'db_or_manual',
   dbField: 'servidumbre',
   options: [
-    { value: 'own', label: 'Propia' },
-    { value: 'public', label: 'Pública' },
-    { value: 'foreign', label: 'Ajena' },
-    { value: 'public_and_foreign', label: 'Pública y Ajena' },
+    { value: 'bueno', label: 'Bueno' },
+    { value: 'medio', label: 'Medio' },
+    { value: 'malo', label: 'Malo' },
   ],
-  formulaDefined: false,
+  formulaDefined: true,
   category: 'probabilidad',
-  computeCost(_value: CriterionValue, _context: EvalContext): number {
+  riskType: 'costo',
+  computeCost(value: CriterionValue, _context: EvalContext): number {
+    if (value === 'medio') return 60_000_000
+    if (value === 'malo') return 120_000_000
     return 0
   },
 }

@@ -7,9 +7,12 @@ const cluster: CriterionModule = {
   unit: '# proyectos',
   dataSource: 'db',
   dbField: 'cluster',
-  formulaDefined: false,
+  formulaDefined: true,
   category: 'fijo',
-  computeCost(_value: CriterionValue, _context: EvalContext): number {
+  computeCost(value: CriterionValue, _context: EvalContext): number {
+    if (value === null || typeof value !== 'number') return 0
+    if (value > 2) return -30_000_000
+    if (value === 2) return -15_000_000
     return 0
   },
 }

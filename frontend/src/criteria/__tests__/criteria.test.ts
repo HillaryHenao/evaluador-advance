@@ -2,6 +2,11 @@ import { describe, it, expect } from 'vitest'
 import corte from '../corte'
 import lleno from '../lleno'
 import pilotes from '../pilotes'
+import numeroArboles from '../numero_arboles'
+import propietario from '../propietario'
+import servidumbre from '../servidumbre'
+import cluster from '../cluster'
+import aprovechamientoForestal from '../aprovechamiento_forestal'
 import distanciaRed from '../distancia_red'
 import distanciaVia from '../distancia_via'
 
@@ -34,6 +39,76 @@ describe('pilotes', () => {
   })
   it('retorna 0 cuando es false', () => {
     expect(pilotes.computeCost(false, ctx)).toBe(0)
+  })
+})
+
+describe('numero_arboles', () => {
+  it('calcula 142.500 COP por árbol', () => {
+    expect(numeroArboles.computeCost(5, ctx)).toBe(5 * 142_500)
+  })
+  it('retorna 0 para valor nulo', () => {
+    expect(numeroArboles.computeCost(null, ctx)).toBe(0)
+  })
+  it('tiene formulaDefined true y category fijo', () => {
+    expect(numeroArboles.formulaDefined).toBe(true)
+    expect(numeroArboles.category).toBe('fijo')
+  })
+})
+
+describe('propietario', () => {
+  it('bueno no agrega sobrecosto', () => {
+    expect(propietario.computeCost('bueno', ctx)).toBe(0)
+  })
+  it('medio agrega 30.000.000', () => {
+    expect(propietario.computeCost('medio', ctx)).toBe(30_000_000)
+  })
+  it('malo agrega 60.000.000', () => {
+    expect(propietario.computeCost('malo', ctx)).toBe(60_000_000)
+  })
+})
+
+describe('servidumbre', () => {
+  it('bueno no agrega sobrecosto', () => {
+    expect(servidumbre.computeCost('bueno', ctx)).toBe(0)
+  })
+  it('medio agrega 60.000.000', () => {
+    expect(servidumbre.computeCost('medio', ctx)).toBe(60_000_000)
+  })
+  it('malo agrega 120.000.000', () => {
+    expect(servidumbre.computeCost('malo', ctx)).toBe(120_000_000)
+  })
+  it('es db_or_manual para permitir ajuste manual cuando no hay estado aprobado', () => {
+    expect(servidumbre.dataSource).toBe('db_or_manual')
+  })
+})
+
+describe('cluster', () => {
+  it('1 proyecto no reduce el CAPEX', () => {
+    expect(cluster.computeCost(1, ctx)).toBe(0)
+  })
+  it('2 proyectos reduce 15.000.000', () => {
+    expect(cluster.computeCost(2, ctx)).toBe(-15_000_000)
+  })
+  it('más de 2 proyectos reduce 30.000.000', () => {
+    expect(cluster.computeCost(3, ctx)).toBe(-30_000_000)
+  })
+  it('retorna 0 para valor nulo', () => {
+    expect(cluster.computeCost(null, ctx)).toBe(0)
+  })
+})
+
+describe('aprovechamiento_forestal', () => {
+  it('sin registro/resuelto no agrega sobrecosto', () => {
+    expect(aprovechamientoForestal.computeCost(null, ctx)).toBe(0)
+  })
+  it('visita agrega 20.000.000', () => {
+    expect(aprovechamientoForestal.computeCost('visita', ctx)).toBe(20_000_000)
+  })
+  it('solicitud radicada agrega 150.000.000', () => {
+    expect(aprovechamientoForestal.computeCost('radicada', ctx)).toBe(150_000_000)
+  })
+  it('otro estado agrega 200.000.000', () => {
+    expect(aprovechamientoForestal.computeCost('otro', ctx)).toBe(200_000_000)
   })
 })
 

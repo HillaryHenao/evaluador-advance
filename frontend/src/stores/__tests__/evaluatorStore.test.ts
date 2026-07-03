@@ -15,9 +15,13 @@ const mockTerrain: TerrainData = {
   cluster: 2,
   tipo_estructura: 'Tracker',
   ocupacion_cauce: false,
-  servidumbre: 'own',
-  aprovechamiento_forestal: 'Exonerado',
+  servidumbre: 'bueno',
+  servidumbre_detalle: { tipo: 'Propia', estado: 'Aprobada' },
+  aprovechamiento_forestal: null,
+  aprovechamiento_forestal_detalle: [{ proyecto: 'Test Proyecto', estado: 'Exonerado' }],
   coexistencias: false,
+  coexistencias_detalle: [],
+  numero_arboles: 5,
 }
 
 beforeEach(() => {
