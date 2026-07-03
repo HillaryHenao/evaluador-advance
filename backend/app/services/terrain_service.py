@@ -147,6 +147,7 @@ def get_terrain_data(code: str) -> Optional[dict]:
                 SELECT
                     t.id                                        AS terrain_id,
                     t.name                                      AS code,
+                    t.radiation                                 AS produccion_especifica,
                     p.name                                      AS name,
                     tc.name                                     AS municipality,
                     p.id                                        AS project_id,
@@ -224,7 +225,14 @@ def get_terrain_data(code: str) -> Optional[dict]:
                           AND vf.name = 'Número de árboles'
                           AND vf.value IS NOT NULL
                         ORDER BY vf.id DESC LIMIT 1
-                    )                                           AS numero_arboles_raw
+                    )                                           AS numero_arboles_raw,
+
+                    -- Arriendo anual desde termsheet
+                    (
+                        SELECT ts.rent_annual_cost_cop
+                        FROM termsheet_termsheet ts
+                        WHERE ts.id = p.termsheet_id
+                    )                                           AS arriendo_anual
 
                 FROM termsheet_terrain t
                 JOIN minifarm_project p ON p.terrain_id = t.id

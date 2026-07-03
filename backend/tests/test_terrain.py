@@ -29,6 +29,7 @@ def test_terrain_returns_data(client):
         'nivel_tension': '34.5 kV', 'cluster': 2, 'tipo_estructura': 'Tracker',
         'ocupacion_cauce': False, 'servidumbre': 'own',
         'aprovechamiento_forestal': 'Exonerado', 'coexistencias': False,
+        'produccion_especifica': 4.5287, 'arriendo_anual': 26275000.0,
     }
     with patch('app.routes.terrain.validate_token', return_value={'pk': 1}), \
          patch('app.services.terrain_service.get_terrain_data', return_value=mock_data):
