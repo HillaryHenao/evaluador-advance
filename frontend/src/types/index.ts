@@ -71,6 +71,8 @@ export interface TerrainData {
   coexistencias: boolean | null
   coexistencias_detalle: CoexistenciaDetalle[] | null
   numero_arboles: number | null
+  produccion_especifica: number | null
+  arriendo_anual: number | null
 }
 
 export interface CoexistenciaDetalle {
@@ -86,6 +88,23 @@ export interface ProyectoEstadoDetalle {
 export interface EstadoDetalle {
   tipo: string
   estado: string
+}
+
+export interface FinancialInputs {
+  capex: number
+  kWp: number
+  kVA: number
+  produccionEspecifica: number
+  arriendoAnual: number
+}
+
+export interface FinancialResults {
+  tir: number
+  tirConBeneficios: number
+  vpn: number
+  vpnConBeneficios: number
+  paybackAnios: number
+  paybackConBeneficiosAnios: number
 }
 
 export interface AuthUser {

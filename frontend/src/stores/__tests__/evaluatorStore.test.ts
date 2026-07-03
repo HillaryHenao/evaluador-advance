@@ -23,6 +23,8 @@ const mockTerrain: TerrainData = {
   coexistencias: false,
   coexistencias_detalle: [],
   numero_arboles: 5,
+  produccion_especifica: 4.5287,
+  arriendo_anual: 26275000,
 }
 
 beforeEach(() => {
