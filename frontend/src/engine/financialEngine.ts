@@ -1,5 +1,6 @@
-import type { FinancialInputs } from '@/types'
+import type { FinancialInputs, FinancialResults } from '@/types'
 import { AÑO_BASE, IPC, FX, PPA_CON_INDEXACION, MANTENIMIENTO_TRACKER, REEMPLAZO_INVERSORES } from './financialData'
+import { irr, npv } from './financialMath'
 
 const N_PERIODOS = 34               // 2026 (inversión) a 2059
 const DURACION_OPERACION_ANIOS = 30 // activo mientras (año - (AÑO_BASE+1)) <= 30
@@ -126,4 +127,68 @@ export function calcularFlujosDeCaja(inputs: FinancialInputs): {
   }
 
   return { flujoInversionista }
+}
+
+const DEPRECIACION_ANIOS = 15
+const TASA_IMPUESTO_RENTA = 0.35
+const TASA_DESCUENTO_VPN = 0.10
+
+function calcularBeneficioTributario(capex: number): number[] {
+  const beneficio: number[] = new Array(N_PERIODOS).fill(0)
+  const depreciacionAnual = capex / DEPRECIACION_ANIOS
+  const depreciacionAceleradaAnual = (capex * 0.5) / DEPRECIACION_ANIOS
+
+  for (let k = 1; k < N_PERIODOS; k++) {
+    const anio = AÑO_BASE + k
+    let total = 0
+    // Depreciación línea recta (años base+1 .. base+15)
+    if (anio < AÑO_BASE + 1 + DEPRECIACION_ANIOS) {
+      total += depreciacionAnual * TASA_IMPUESTO_RENTA
+    }
+    // Depreciación acelerada sobre 50% del capex, desplazada 1 año (años base+2 .. base+16)
+    if (anio - 1 < AÑO_BASE + 1 + DEPRECIACION_ANIOS && k >= 2) {
+      total += depreciacionAceleradaAnual * TASA_IMPUESTO_RENTA
+    }
+    beneficio[k] = total
+  }
+  return beneficio
+}
+
+function calcularPayback(flujos: number[]): number {
+  // Replica el conteo del Excel (filas 45-47): el año de inversión (índice 0) siempre
+  // contribuye 1 año completo; los años siguientes contribuyen 1 si aún no se recupera
+  // la inversión, una fracción en el año que cruza a positivo, y 0 después.
+  let contador = 1
+  let remanente = -flujos[0]
+  for (let k = 1; k < flujos.length; k++) {
+    if (remanente <= 0) continue
+    const remanenteAnterior = remanente
+    remanente = remanente - flujos[k]
+    if (remanente > 0) {
+      contador += 1
+    } else {
+      contador += remanenteAnterior / flujos[k]
+    }
+  }
+  return contador
+}
+
+export function calcularFinanzas(inputs: FinancialInputs): FinancialResults {
+  const { flujoInversionista } = calcularFlujosDeCaja(inputs)
+  const beneficioTributario = calcularBeneficioTributario(inputs.capex)
+  const flujoInversionistaConBeneficios = flujoInversionista.map((f, i) => f + beneficioTributario[i])
+
+  // NPV Excel: NPV(10%, años 1..31) + flujo año 0 (columnas D:AH del Excel = índices 1..31)
+  const vpn = flujoInversionista[0] + npv(TASA_DESCUENTO_VPN, flujoInversionista.slice(1, 32))
+  const vpnConBeneficios =
+    flujoInversionistaConBeneficios[0] + npv(TASA_DESCUENTO_VPN, flujoInversionistaConBeneficios.slice(1, 32))
+
+  return {
+    tir: irr(flujoInversionista),
+    tirConBeneficios: irr(flujoInversionistaConBeneficios),
+    vpn,
+    vpnConBeneficios,
+    paybackAnios: calcularPayback(flujoInversionista),
+    paybackConBeneficiosAnios: calcularPayback(flujoInversionistaConBeneficios),
+  }
 }
