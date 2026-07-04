@@ -17,6 +17,9 @@ const IVA = 0.19
 const MANTENIMIENTO_POR_KVA = 54000.0
 const SERVICIOS_PUBLICOS_MENSUAL = 1_500_000.0
 const PRECIO_REC_USD_MWH = 1.5
+const DEPRECIACION_ANIOS = 15
+const TASA_IMPUESTO_RENTA = 0.35
+const TASA_DESCUENTO_VPN = 0.10
 
 function activo(anio: number): number {
   return anio - (AÑO_BASE + 1) <= DURACION_OPERACION_ANIOS ? 1 : 0
@@ -129,10 +132,6 @@ export function calcularFlujosDeCaja(inputs: FinancialInputs): {
   return { flujoInversionista }
 }
 
-const DEPRECIACION_ANIOS = 15
-const TASA_IMPUESTO_RENTA = 0.35
-const TASA_DESCUENTO_VPN = 0.10
-
 function calcularBeneficioTributario(capex: number): number[] {
   const beneficio: number[] = new Array(N_PERIODOS).fill(0)
   const depreciacionAnual = capex / DEPRECIACION_ANIOS
@@ -158,6 +157,8 @@ function calcularPayback(flujos: number[]): number {
   // Replica el conteo del Excel (filas 45-47): el año de inversión (índice 0) siempre
   // contribuye 1 año completo; los años siguientes contribuyen 1 si aún no se recupera
   // la inversión, una fracción en el año que cruza a positivo, y 0 después.
+  // NOTA: aproximación aceptada (±1 año); la convención exacta de fracción-de-año
+  // del Excel no se replica al 100% — TIR y VPN sí son exactos (~9 decimales).
   let contador = 1
   let remanente = -flujos[0]
   for (let k = 1; k < flujos.length; k++) {

@@ -45,4 +45,14 @@ describe('calcularFinanzas — golden master contra el Excel', () => {
   it('VPN con beneficios ≈ $1,576.1M', () => {
     expect(resultado.vpnConBeneficios).toBeCloseTo(1_576_145_841, -6)
   })
+
+  it('Payback ≈ 9 años (±1 año, aproximación conocida)', () => {
+    expect(resultado.paybackAnios).toBeGreaterThan(8)
+    expect(resultado.paybackAnios).toBeLessThan(10)
+  })
+
+  it('Payback con beneficios ≈ 7 años (±1 año, aproximación conocida)', () => {
+    expect(resultado.paybackConBeneficiosAnios).toBeGreaterThan(6)
+    expect(resultado.paybackConBeneficiosAnios).toBeLessThan(8)
+  })
 })

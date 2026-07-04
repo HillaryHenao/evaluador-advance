@@ -17,7 +17,10 @@ export const FX = [
   3708.4, 3695.8, 3683.2, 3670.6,
 ]
 
-// PPA con indexación (COP/kWh) — ya incluye el ajuste por IPP acumulado del Excel (fila 105)
+// PPA con indexación (COP/kWh) — ya incluye el ajuste por IPP acumulado del Excel (fila 105).
+// NOTA de indexación: en financialEngine.ts se consume con un año de rezago, PPA_CON_INDEXACION[k-1]
+// (igual que IPC[k-1]), mientras que FX se consume del mismo año, FX[k] — pese a que las tres tablas
+// están alineadas por año calendario aquí (índice 0 = 2026).
 export const PPA_CON_INDEXACION = [
   350.9462719, 349.3700922, 343.6267887, 344.7270552, 353.8970224, 363.8061391,
   371.515938, 374.2800166, 382.1424431, 379.3889236, 376.1816073, 372.4972404,

@@ -9,8 +9,12 @@ function formatPct(value: number): string {
 }
 
 function formatCOP(value: number): string {
-  if (Math.abs(value) >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(2).replace('.', ',')} B`
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1).replace('.', ',')} M`
+  const sign = value < 0 ? '-' : ''
+  const abs = Math.abs(value)
+  if (abs >= 1_000_000_000)
+    return `${sign}$${(abs / 1_000_000_000).toFixed(2).replace('.', ',')} B`
+  if (abs >= 1_000_000)
+    return `${sign}$${(abs / 1_000_000).toFixed(1).replace('.', ',')} M`
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value)
 }
 
