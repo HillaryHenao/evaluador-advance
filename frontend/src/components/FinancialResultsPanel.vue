@@ -24,6 +24,7 @@ function formatAnios(value: number): string {
 
 const faltaProduccion = computed(() => !store.terrainData?.produccion_especifica)
 const faltaArriendo = computed(() => !store.arriendoManual && !store.terrainData?.arriendo_anual)
+const arriendoEfectivo = computed(() => store.arriendoManual ?? store.terrainData?.arriendo_anual ?? null)
 </script>
 
 <template>
@@ -72,6 +73,16 @@ const faltaArriendo = computed(() => !store.arriendoManual && !store.terrainData
     </template>
 
     <div class="financial-inputs">
+      <div class="financial-row" v-if="store.terrainData?.produccion_especifica">
+        <span class="financial-label">Producción específica</span>
+        <span class="financial-value">{{ store.terrainData.produccion_especifica }} kWh/kWp/día</span>
+      </div>
+
+      <div class="financial-row" v-if="arriendoEfectivo">
+        <span class="financial-label">Arriendo anual</span>
+        <span class="financial-value">{{ formatCOP(arriendoEfectivo) }}</span>
+      </div>
+
       <label class="financial-input-label">
         Potencia AC (kVA)
         <input
