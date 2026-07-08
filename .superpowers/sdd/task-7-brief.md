@@ -1,422 +1,180 @@
-# Task 7 Brief: Componentes UI (4)
+## Task 7: `FinancialResultsPanel.vue`
 
-## Context
-Task 7 of 10. Tasks 1-6 complete. All stores and services exist. Your job: create 4 Vue components used by EvaluadorView (Task 8): AppHeader, TerrainSearch, CriterionCard, SummaryPanel.
+**Files:**
+- Create: `frontend/src/components/FinancialResultsPanel.vue`
 
-## Global Constraints
-- Work in `C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend\`
-- No tests for this task — components verified visually in Task 8
-- Colors via CSS vars: `--color-navy #152644`, `--color-navy-light #1e3459`, `--color-lemony #E2FF65`, `--color-nashville #8EC3E1`, `--color-white #ffffff`, `--color-gray #6b7280`, `--color-orange #f97316`
-- Font: Montserrat (imported in main.css)
-- `@` alias = `src/`
-- Run `npx tsc --noEmit` to confirm TypeScript clean
-- Use PowerShell for commands
+**Interfaces:**
+- Consumes: `useEvaluatorStore().financialResults`, `.arriendoManual`, `.kVA` (Task 6).
+- Produces: componente `<FinancialResultsPanel />` sin props, consumido por Task 8 (`EvaluadorView.vue`).
 
-## Files to Create
-- `src/components/AppHeader.vue`
-- `src/components/TerrainSearch.vue`
-- `src/components/CriterionCard.vue`
-- `src/components/SummaryPanel.vue`
-
-## Component 1: AppHeader.vue
-
-```vue
-<script setup lang="ts">
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/authStore'
-
-const auth = useAuthStore()
-const router = useRouter()
-
-function handleLogout() {
-  auth.logout()
-  router.push({ name: 'login' })
-}
-</script>
-
-<template>
-  <header class="app-header">
-    <div class="header-brand">
-      <span class="header-logo">Solé</span>
-      <span class="header-title">Evaluador Advance</span>
-    </div>
-    <div class="header-user" v-if="auth.user">
-      <span class="header-username">{{ auth.user.first_name }} {{ auth.user.last_name }}</span>
-      <button class="header-logout" @click="handleLogout">Salir</button>
-    </div>
-  </header>
-</template>
-
-<style scoped>
-.app-header {
-  background-color: var(--color-navy);
-  border-bottom: 1px solid rgba(226, 255, 101, 0.15);
-  padding: 0 1.5rem;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-.header-brand { display: flex; align-items: center; gap: 0.75rem; }
-.header-logo { font-size: 1.4rem; font-weight: 700; color: var(--color-lemony); }
-.header-title { font-size: 0.9rem; font-weight: 500; color: var(--color-nashville); }
-.header-user { display: flex; align-items: center; gap: 1rem; }
-.header-username { font-size: 0.85rem; color: var(--color-white); }
-.header-logout {
-  background: transparent;
-  border: 1px solid rgba(255,255,255,0.2);
-  color: var(--color-white);
-  border-radius: 4px;
-  padding: 0.25rem 0.6rem;
-  font-family: 'Montserrat', sans-serif;
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: border-color 0.2s;
-}
-.header-logout:hover { border-color: var(--color-lemony); color: var(--color-lemony); }
-</style>
-```
-
-## Component 2: TerrainSearch.vue
-
-```vue
-<script setup lang="ts">
-import { ref } from 'vue'
-import { useEvaluatorStore } from '@/stores/evaluatorStore'
-
-const store = useEvaluatorStore()
-const code = ref('')
-
-async function handleSearch() {
-  if (!code.value.trim()) return
-  await store.fetchTerrain(code.value.trim().toUpperCase())
-}
-</script>
-
-<template>
-  <div class="terrain-search">
-    <div class="search-row">
-      <input
-        v-model="code"
-        type="text"
-        placeholder="Ej. COLCEST5"
-        class="search-input"
-        @keyup.enter="handleSearch"
-      />
-      <button class="search-btn" @click="handleSearch" :disabled="store.loading">
-        {{ store.loading ? 'Buscando...' : 'Buscar' }}
-      </button>
-    </div>
-    <div v-if="store.terrainData" class="terrain-info">
-      <span class="terrain-badge terrain-badge--ok">✓</span>
-      <span>{{ store.terrainData.code }}</span>
-      <span class="terrain-sep">·</span>
-      <span>{{ store.terrainData.municipality }}</span>
-      <span class="terrain-sep">·</span>
-      <span>{{ store.terrainData.or ?? 'OR no disponible' }}</span>
-    </div>
-    <div v-if="store.error" class="terrain-error">{{ store.error }}</div>
-  </div>
-</template>
-
-<style scoped>
-.terrain-search { padding: 1rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.08); }
-.search-row { display: flex; gap: 0.75rem; }
-.search-input {
-  flex: 1;
-  max-width: 280px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 6px;
-  padding: 0.5rem 0.8rem;
-  color: var(--color-white);
-  font-family: 'Montserrat', sans-serif;
-  font-size: 0.9rem;
-  outline: none;
-  transition: border-color 0.2s;
-  text-transform: uppercase;
-}
-.search-input:focus { border-color: var(--color-lemony); }
-.search-btn {
-  background: var(--color-lemony);
-  color: var(--color-navy);
-  border: none;
-  border-radius: 6px;
-  padding: 0.5rem 1.2rem;
-  font-family: 'Montserrat', sans-serif;
-  font-weight: 700;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
-.search-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-.terrain-info {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.6rem;
-  font-size: 0.85rem;
-  color: var(--color-nashville);
-}
-.terrain-badge--ok { color: var(--color-lemony); font-weight: 700; }
-.terrain-sep { opacity: 0.4; }
-.terrain-error { margin-top: 0.5rem; font-size: 0.82rem; color: #f87171; }
-</style>
-```
-
-## Component 3: CriterionCard.vue
+- [ ] **Step 1: Crear el componente**
 
 ```vue
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useEvaluatorStore } from '@/stores/evaluatorStore'
-import { loadCriteria } from '@/engine/evaluatorEngine'
-import type { CriterionResult } from '@/types'
 
-const props = defineProps<{ result: CriterionResult }>()
 const store = useEvaluatorStore()
 
-const module = computed(() => loadCriteria().find(c => c.id === props.result.id))
-
-const borderColor = computed(() => {
-  if (!props.result.formulaDefined) return 'var(--color-orange)'
-  if (props.result.value !== null) return 'var(--color-lemony)'
-  return 'var(--color-gray)'
-})
+function formatPct(value: number): string {
+  return `${(value * 100).toFixed(2)}%`
+}
 
 function formatCOP(value: number): string {
-  if (value === 0) return '—'
+  if (Math.abs(value) >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(2).replace('.', ',')} B`
+  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1).replace('.', ',')} M`
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value)
 }
 
-function handleInput(event: Event) {
-  const target = event.target as HTMLInputElement
-  const raw = target.value
-  store.setCriterionValue(props.result.id, raw === '' ? null : Number(raw))
+function formatAnios(value: number): string {
+  return `${value.toFixed(1)} años`
 }
 
-function handleSelect(event: Event) {
-  const target = event.target as HTMLSelectElement
-  store.setCriterionValue(props.result.id, target.value || null)
-}
-
-function handleToggle(event: Event) {
-  const target = event.target as HTMLInputElement
-  store.setCriterionValue(props.result.id, target.checked)
-}
+const faltaProduccion = computed(() => !store.terrainData?.produccion_especifica)
+const faltaArriendo = computed(() => !store.arriendoManual && !store.terrainData?.arriendo_anual)
 </script>
 
 <template>
-  <div class="criterion-card" :style="{ borderLeftColor: borderColor }">
-    <div class="card-header">
-      <span class="card-label">{{ result.label }}</span>
-      <div class="card-badges">
-        <span v-if="result.fromDb" class="badge badge--db">Desde BD</span>
-        <span v-if="!result.formulaDefined" class="badge badge--pending">Fórmula pendiente</span>
-      </div>
+  <aside class="financial-panel">
+    <h2 class="financial-title">Resultados financieros</h2>
+
+    <div v-if="!store.financialResults" class="financial-empty">
+      <p v-if="faltaProduccion">Falta producción específica del terreno.</p>
+      <p v-if="faltaArriendo">Falta arriendo anual — completa manualmente:</p>
+      <input
+        v-if="faltaArriendo"
+        type="number"
+        placeholder="Arriendo anual (COP)"
+        class="financial-input"
+        @change="(e) => (store.arriendoManual = Number((e.target as HTMLInputElement).value) || null)"
+      />
     </div>
 
-    <div class="card-input">
-      <!-- Number input -->
-      <template v-if="module?.inputType === 'number'">
+    <template v-else>
+      <div class="financial-row">
+        <span class="financial-label">TIR</span>
+        <span class="financial-value">{{ formatPct(store.financialResults.tir) }}</span>
+      </div>
+      <div class="financial-row">
+        <span class="financial-label">TIR c. beneficios tributarios</span>
+        <span class="financial-value financial-value--highlight">{{ formatPct(store.financialResults.tirConBeneficios) }}</span>
+      </div>
+      <div class="financial-divider" />
+      <div class="financial-row">
+        <span class="financial-label">VPN</span>
+        <span class="financial-value">{{ formatCOP(store.financialResults.vpn) }}</span>
+      </div>
+      <div class="financial-row">
+        <span class="financial-label">VPN c. beneficios</span>
+        <span class="financial-value financial-value--highlight">{{ formatCOP(store.financialResults.vpnConBeneficios) }}</span>
+      </div>
+      <div class="financial-divider" />
+      <div class="financial-row">
+        <span class="financial-label">Payback</span>
+        <span class="financial-value">{{ formatAnios(store.financialResults.paybackAnios) }}</span>
+      </div>
+      <div class="financial-row">
+        <span class="financial-label">Payback c. beneficios</span>
+        <span class="financial-value financial-value--highlight">{{ formatAnios(store.financialResults.paybackConBeneficiosAnios) }}</span>
+      </div>
+    </template>
+
+    <div class="financial-inputs">
+      <label class="financial-input-label">
+        Potencia AC (kVA)
         <input
           type="number"
-          :value="result.value as number ?? ''"
-          :disabled="result.fromDb"
-          :placeholder="`0 ${module.unit ?? ''}`"
-          class="input-field"
-          @input="handleInput"
+          :value="store.kVA"
+          class="financial-input"
+          @change="(e) => (store.kVA = Number((e.target as HTMLInputElement).value) || 1000)"
         />
-        <span v-if="module.unit" class="input-unit">{{ module.unit }}</span>
-      </template>
-
-      <!-- Toggle -->
-      <template v-else-if="module?.inputType === 'toggle'">
-        <label class="toggle-label">
-          <input
-            type="checkbox"
-            :checked="result.value === true"
-            :disabled="result.fromDb"
-            class="toggle-checkbox"
-            @change="handleToggle"
-          />
-          <span>{{ result.value === true ? 'Sí' : 'No' }}</span>
-        </label>
-      </template>
-
-      <!-- Select -->
-      <template v-else-if="module?.inputType === 'select'">
-        <select
-          :value="result.value as string ?? ''"
-          :disabled="result.fromDb"
-          class="input-field"
-          @change="handleSelect"
-        >
-          <option value="">— Seleccionar —</option>
-          <option v-for="opt in module.options" :key="opt.value" :value="opt.value">
-            {{ opt.label }}
-          </option>
-        </select>
-      </template>
-    </div>
-
-    <div class="card-cost" v-if="result.formulaDefined">
-      <span class="cost-label">Sobrecosto:</span>
-      <span class="cost-value">{{ formatCOP(result.sobrecosto) }}</span>
-    </div>
-  </div>
-</template>
-
-<style scoped>
-.criterion-card {
-  background: var(--color-navy-light);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-left: 4px solid var(--color-gray);
-  border-radius: 8px;
-  padding: 1rem;
-  transition: border-left-color 0.2s;
-}
-.card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem; }
-.card-label { font-size: 0.88rem; font-weight: 600; color: var(--color-white); }
-.card-badges { display: flex; gap: 0.4rem; }
-.badge {
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 0.15rem 0.45rem;
-  border-radius: 4px;
-}
-.badge--db { background: rgba(142, 195, 225, 0.2); color: var(--color-nashville); }
-.badge--pending { background: rgba(249, 115, 22, 0.2); color: var(--color-orange); }
-.card-input { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem; }
-.input-field {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 5px;
-  padding: 0.4rem 0.6rem;
-  color: var(--color-white);
-  font-family: 'Montserrat', sans-serif;
-  font-size: 0.85rem;
-  outline: none;
-  width: 100%;
-  max-width: 180px;
-}
-.input-field:disabled { opacity: 0.6; cursor: not-allowed; }
-.input-field:focus { border-color: var(--color-lemony); }
-.input-unit { font-size: 0.78rem; color: var(--color-gray); }
-.toggle-label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem; }
-.toggle-checkbox { accent-color: var(--color-lemony); width: 16px; height: 16px; }
-.card-cost { display: flex; justify-content: space-between; }
-.cost-label { font-size: 0.78rem; color: var(--color-gray); }
-.cost-value { font-size: 0.85rem; font-weight: 600; color: var(--color-lemony); }
-</style>
-```
-
-## Component 4: SummaryPanel.vue
-
-```vue
-<script setup lang="ts">
-import { computed } from 'vue'
-import { useEvaluatorStore } from '@/stores/evaluatorStore'
-
-const store = useEvaluatorStore()
-
-function formatCOP(value: number): string {
-  if (value >= 1_000_000_000)
-    return `$${(value / 1_000_000_000).toFixed(2).replace('.', ',')} B`
-  if (value >= 1_000_000)
-    return `$${(value / 1_000_000).toFixed(1).replace('.', ',')} M`
-  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value)
-}
-
-const activeBreakdown = computed(() =>
-  store.aggregated.breakdown.filter(r => r.formulaDefined && r.value !== null && r.sobrecosto > 0)
-)
-</script>
-
-<template>
-  <aside class="summary-panel">
-    <h2 class="summary-title">Resumen de costos</h2>
-
-    <div class="summary-section">
-      <p class="summary-label">CAPEX base</p>
-      <p class="summary-value">{{ formatCOP(store.baseCapex) }}</p>
-    </div>
-
-    <div class="summary-divider" />
-
-    <div v-if="activeBreakdown.length === 0" class="summary-empty">
-      Sin sobrecostos calculados aún.
-    </div>
-
-    <div v-for="item in activeBreakdown" :key="item.id" class="summary-row">
-      <span class="summary-row-label">{{ item.label }}</span>
-      <span class="summary-row-value">{{ formatCOP(item.sobrecosto) }}</span>
-    </div>
-
-    <div v-if="activeBreakdown.length > 0" class="summary-divider" />
-
-    <div class="summary-section">
-      <p class="summary-label">Total sobrecostos</p>
-      <p class="summary-value summary-value--orange">{{ formatCOP(store.aggregated.totalSobrecosto) }}</p>
-    </div>
-
-    <div class="summary-total">
-      <p class="summary-total-label">CAPEX Total</p>
-      <p class="summary-total-value">{{ formatCOP(store.aggregated.capexTotal) }}</p>
+      </label>
     </div>
   </aside>
 </template>
 
 <style scoped>
-.summary-panel {
+.financial-panel {
   width: 280px;
   min-width: 280px;
-  background: var(--color-navy-light);
-  border-left: 1px solid rgba(255,255,255,0.08);
+  background: var(--card);
+  border-left: 1.5px solid var(--border);
   padding: 1.5rem 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  position: sticky;
-  top: 56px;
-  height: calc(100vh - 56px);
-  overflow-y: auto;
+  gap: 0.65rem;
 }
-.summary-title { font-size: 0.9rem; font-weight: 700; color: var(--color-nashville); margin-bottom: 0.25rem; }
-.summary-section { display: flex; justify-content: space-between; align-items: baseline; }
-.summary-label { font-size: 0.78rem; color: var(--color-gray); }
-.summary-value { font-size: 0.9rem; font-weight: 600; color: var(--color-white); }
-.summary-value--orange { color: var(--color-orange); }
-.summary-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 0.25rem 0; }
-.summary-empty { font-size: 0.78rem; color: var(--color-gray); text-align: center; padding: 0.5rem 0; }
-.summary-row { display: flex; justify-content: space-between; font-size: 0.8rem; }
-.summary-row-label { color: var(--color-white); }
-.summary-row-value { color: var(--color-lemony); font-weight: 600; }
-.summary-total {
-  margin-top: 0.25rem;
-  padding: 0.75rem;
-  background: rgba(226, 255, 101, 0.08);
-  border: 1px solid rgba(226, 255, 101, 0.25);
-  border-radius: 8px;
+
+.financial-title {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--purple);
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 0.1rem;
 }
-.summary-total-label { font-size: 0.78rem; color: var(--color-nashville); margin-bottom: 0.25rem; }
-.summary-total-value { font-size: 1.15rem; font-weight: 700; color: var(--color-lemony); }
+
+.financial-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.8rem;
+}
+.financial-label { color: var(--text-mid); font-weight: 500; }
+.financial-value { font-weight: 700; color: var(--text); }
+.financial-value--highlight { color: var(--purple); }
+
+.financial-divider { height: 1px; background: var(--border); margin: 0.2rem 0; }
+
+.financial-empty {
+  font-size: 0.78rem;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.financial-inputs {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--border);
+}
+.financial-input-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.financial-input {
+  background: #faf8fe;
+  border: 1.5px solid var(--border);
+  border-radius: 9px;
+  padding: 0.45rem 0.7rem;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.85rem;
+}
 </style>
 ```
 
-## Steps
-1. Create `src/components/AppHeader.vue`
-2. Create `src/components/TerrainSearch.vue`
-3. Create `src/components/CriterionCard.vue`
-4. Create `src/components/SummaryPanel.vue`
-5. Run TypeScript check: `cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend" && npx tsc --noEmit`
-6. Fix any TS errors
-7. Commit: `cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance" && git add frontend/src/components/ && git commit -m "feat: add AppHeader, TerrainSearch, CriterionCard, SummaryPanel components"`
+- [ ] **Step 2: Verificar que compila**
 
-## Report Contract
-Write report to: `C:\Users\EQUIPO\Documents\Claude\evaluador-advance\.superpowers\sdd\task-7-report.md`
+```bash
+cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
+npx vue-tsc -b
+```
 
-Return ONLY: status, commit hash(es), one-line summary, concerns.
+Expected: mismos 2 errores preexistentes de siempre, ninguno nuevo en `FinancialResultsPanel.vue`.
+
+- [ ] **Step 3: Commit**
+
+```bash
+cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance"
+git add frontend/src/components/FinancialResultsPanel.vue
+git commit -m "feat: add FinancialResultsPanel component"
+```
+
+---
+

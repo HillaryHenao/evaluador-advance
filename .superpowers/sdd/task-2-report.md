@@ -1,51 +1,101 @@
-# Task 2 Report: Módulos de criterios (19)
+# Task 2 Report: Tipos TypeScript para el motor financiero
 
-## Status
-DONE
+## Summary
 
-## Commit
-cb4e03a — feat: add 19 criterion modules (5 with formulas, 14 pending)
+Successfully implemented all TypeScript type definitions for the financial engine module. Added 2 new fields to TerrainData interface, created 2 new financial engine interfaces (FinancialInputs and FinancialResults), and updated the test fixture to include the new fields.
 
-## Files Created (20 total)
+## Implementation Details
 
-### Criteria with formulas (formulaDefined: true)
-- `frontend/src/criteria/corte.ts` — 50,000 COP/m³
-- `frontend/src/criteria/lleno.ts` — 250,000 COP/m³
-- `frontend/src/criteria/pilotes.ts` — 156,000,000 COP (toggle)
-- `frontend/src/criteria/distancia_red.ts` — tiered pricing (5 bands)
-- `frontend/src/criteria/distancia_via.ts` — 457,292 COP/m
+### Step 1: TerrainData Interface Updates
+Added two new nullable number fields to the existing TerrainData interface in `frontend/src/types/index.ts`:
+- `produccion_especifica: number | null` (line 74)
+- `arriendo_anual: number | null` (line 75)
 
-### Pending criteria (formulaDefined: false, computeCost returns 0)
-- `frontend/src/criteria/nivel_tension.ts`
-- `frontend/src/criteria/cluster.ts`
-- `frontend/src/criteria/obras_hidraulicas.ts`
-- `frontend/src/criteria/disposicion_movimiento.ts`
-- `frontend/src/criteria/amenazas.ts`
-- `frontend/src/criteria/or.ts`
-- `frontend/src/criteria/propietario.ts`
-- `frontend/src/criteria/tipo_estructura.ts`
-- `frontend/src/criteria/ocupacion_cauce.ts`
-- `frontend/src/criteria/servidumbre.ts`
-- `frontend/src/criteria/aprovechamiento_forestal.ts`
-- `frontend/src/criteria/coexistencias.ts`
-- `frontend/src/criteria/numero_arboles.ts`
-- `frontend/src/criteria/comunidad.ts`
+These fields represent platform-specific production metrics and annual lease costs required by the financial engine.
 
-### Test file
-- `frontend/src/criteria/__tests__/criteria.test.ts`
+### Step 2: Financial Engine Interfaces
+Added two new interfaces before the AuthUser interface:
 
-## Test Output
+**FinancialInputs** (lines 93-99):
+- capex: number
+- kWp: number
+- kVA: number
+- produccionEspecifica: number
+- arriendoAnual: number
 
-Command: `cd frontend && npx vitest run src/criteria/__tests__/criteria.test.ts`
+**FinancialResults** (lines 101-108):
+- tir: number (Internal Rate of Return)
+- tirConBeneficios: number (TIR with benefits)
+- vpn: number (Net Present Value)
+- vpnConBeneficios: number (VPN with benefits)
+- paybackAnios: number (Payback period in years)
+- paybackConBeneficiosAnios: number (Payback period with benefits in years)
+
+### Step 3: Test Fixture Updates
+Updated `mockTerrain` in `frontend/src/stores/__tests__/evaluatorStore.test.ts` to include the new fields:
+- produccion_especifica: 4.5287
+- arriendo_anual: 26275000
+
+## Testing Results
+
+### TypeScript Compilation (vue-tsc -b)
+```
+src/engine/__tests__/evaluatorEngine.test.ts(9,3): error TS2578: Unused '@ts-expect-error' directive.
+vite.config.ts(13,3): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Object literal may only specify known properties, and 'test' does not exist in type 'UserConfigExport'.
+```
+
+**Status:** PASS - Exactly 2 pre-existing errors as expected. No new errors related to TerrainData or financial engine types.
+
+### Unit Tests (vitest run)
+```
+ Test Files  4 passed (4)
+      Tests  53 passed (53)
+   Start at  16:06:17
+   Duration  2.48s (transform 712ms, setup 0ms, import 1.86s, tests 71ms, environment 5.48ms)
+```
+
+**Status:** PASS - All 53 tests pass. No test breakage from the new type definitions.
+
+## Files Changed
+
+1. `frontend/src/types/index.ts`:
+   - Added 2 fields to TerrainData interface (lines 74-75)
+   - Added FinancialInputs interface (lines 93-99)
+   - Added FinancialResults interface (lines 101-108)
+
+2. `frontend/src/stores/__tests__/evaluatorStore.test.ts`:
+   - Updated mockTerrain fixture with new fields (lines 26-27)
+
+## Self-Review Findings
+
+✅ **Completeness:** Both TerrainData fields present with correct types (number | null)
+✅ **Interface Definition:** Both FinancialInputs and FinancialResults interfaces match specification exactly
+✅ **Placement:** New interfaces correctly positioned before AuthUser
+✅ **Naming:** Field names match specification (camelCase for FinancialInputs/Results fields, snake_case for TerrainData fields)
+✅ **Style Consistency:** Formatting aligns with existing code patterns in the file
+✅ **Test Fixture:** mockTerrain updated with both new fields and correct test values
+✅ **No Unrelated Changes:** Only modified the required files with surgical additions
+✅ **Type Safety:** TypeScript compilation succeeds with expected pre-existing errors only
+✅ **Tests:** All 53 existing tests pass without modification to test logic
+
+## Concerns
+
+None. The implementation:
+- Matches the task brief exactly
+- Introduces no new type errors
+- Maintains backward compatibility (all fields are optional in TerrainData via null typing)
+- Passes all existing tests without modification
+- Follows the established code style and patterns
+
+## Git Commit
 
 ```
- Test Files  1 passed (1)
-      Tests  15 passed (15)
-   Start at  15:53:31
-   Duration  2.45s
+ee9c1b7 feat: add TerrainData platform fields and financial engine types
 ```
 
-15/15 tests passing (the brief required all 12 minimum; vitest counted 15 because the suite contains 3 extra assertions included in the test file as written).
-
-## Deviations
-None. All ids, labels, formulas, options, and file names match the brief verbatim.
+Commit includes:
+- 2 files changed
+- 21 insertions
+- Comprehensive commit message explaining the addition

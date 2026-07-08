@@ -1,196 +1,145 @@
-# Task 3 Brief: Motor de criterios (evaluatorEngine.ts)
+## Task 3: Datos macro + utilidades matemáticas (IRR/NPV)
 
-## Context
-Task 3 of 10. Tasks 1 and 2 are complete. The 19 criterion modules exist in `frontend/src/criteria/*.ts`. Your job is to build `evaluatorEngine.ts` — the central engine that loads all modules via `import.meta.glob` and exposes three functions.
+**Files:**
+- Create: `frontend/src/engine/financialData.ts`
+- Create: `frontend/src/engine/financialMath.ts`
+- Test: `frontend/src/engine/__tests__/financialMath.test.ts`
 
-## Global Constraints
-- Work in `C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend\`
-- File: `src/engine/evaluatorEngine.ts`
-- Tests: `src/engine/__tests__/evaluatorEngine.test.ts`
-- Run with: `npx vitest run src/engine/__tests__/evaluatorEngine.test.ts`
-- `@` alias resolves to `src/`
-- All tests must PASS before committing
-- Use PowerShell for commands
+**Interfaces:**
+- Produces: `IPC: number[]`, `FX: number[]`, `PPA_CON_INDEXACION: number[]` (arrays de 34 elementos, índice 0 = año 2026, índice 33 = año 2059), `AÑO_BASE = 2026`. `irr(cashflows: number[]): number`, `npv(rate: number, cashflows: number[]): number`. Usadas por Task 4/5 (`financialEngine.ts`).
 
-## Interface (from src/types/index.ts — do not redefine)
-```typescript
-import type { CriterionModule, CriterionValue, EvalContext, CriterionResult, AggregatedResult } from '@/types'
-type CriterionValues = Record<string, CriterionValue>
+- [ ] **Step 1: Crear `financialData.ts` con las tablas macro exactas del Excel**
+
+```ts
+// Tablas macro extraídas literal de "Supuestos y resultados" filas 97-105 del Excel
+// "Retail Modelo financiero - Plantilla Evaluador.xlsx". Índice 0 = año 2026, índice 33 = año 2059.
+
+export const AÑO_BASE = 2026
+
+export const IPC = [
+  0.064, 0.0523, 0.0406, 0.0372, 0.0333, 0.032, 0.032, 0.032, 0.032, 0.032,
+  0.032, 0.032, 0.032, 0.032, 0.032, 0.032, 0.032, 0.032, 0.032, 0.032,
+  0.032, 0.032, 0.032, 0.032, 0.032, 0.032, 0.032, 0.032, 0.032, 0.032,
+  0.032, 0.032, 0.032, 0.032,
+]
+
+export const FX = [
+  3751.0, 3834.0, 3947.0, 3990.0, 4036.0, 4023.4, 4010.8, 3998.2, 3985.6, 3973,
+  3960.4, 3947.8, 3935.2, 3922.6, 3910, 3897.4, 3884.8, 3872.2, 3859.6, 3847,
+  3834.4, 3821.8, 3809.2, 3796.6, 3784, 3771.4, 3758.8, 3746.2, 3733.6, 3721,
+  3708.4, 3695.8, 3683.2, 3670.6,
+]
+
+// PPA con indexación (COP/kWh) — ya incluye el ajuste por IPP acumulado del Excel (fila 105)
+export const PPA_CON_INDEXACION = [
+  350.9462719, 349.3700922, 343.6267887, 344.7270552, 353.8970224, 363.8061391,
+  371.515938, 374.2800166, 382.1424431, 379.3889236, 376.1816073, 372.4972404,
+  374.1578388, 378.624348, 389.2258297, 398.5363587, 408.0631242, 417.8109361,
+  427.784704, 437.9894391, 448.4302562, 459.1123753, 470.0411238, 481.221938,
+  492.6603657, 504.3620673, 516.3328184, 528.5785117, 541.105159, 553.9188929,
+  567.0259695, 580.43277, 594.1458029, 608.1717064,
+]
+
+// Mantenimiento de tracker (fila 23 del Excel): ocurre cada 5 años empezando en el
+// período 6 (año 2032), con el monto compuesto por IPC desde la ocurrencia anterior.
+// Reemplazo de inversores y motores (fila 22): ocurre una sola vez, período 16 (año 2042).
+// Ambos son valores ya calculados con las tarifas y tipo de cambio fijos del Excel —
+// no dependen de los inputs del terreno (capex/kWp/producción/arriendo), por eso van
+// literales aquí en vez de recalcularse.
+export const MANTENIMIENTO_TRACKER: Record<number, number> = {
+  6: -35_117_188.69,
+  11: -41_107_231.39,
+  16: -48_119_013.38,
+  21: -56_326_815.75,
+  26: -65_934_647.24,
+}
+
+export const REEMPLAZO_INVERSORES: Record<number, number> = {
+  16: -250_052_057,
+}
 ```
 
-## Three functions to implement
+- [ ] **Step 2: Escribir el test de `irr`/`npv` (falla primero)**
 
-### loadCriteria(): CriterionModule[]
-- Uses `import.meta.glob('../criteria/*.ts', { eager: true })` to load all criterion modules
-- Caches result in module-level variable `_cachedCriteria`
-- Filters out any falsy values
-- Returns array of CriterionModule
+```ts
+import { describe, it, expect } from 'vitest'
+import { irr, npv } from '../financialMath'
 
-### evaluateCriteria(values: CriterionValues, context: EvalContext): CriterionResult[]
-- Calls `loadCriteria()`
-- For each criterion: extracts `values[criterion.id] ?? null`, computes sobrecosto (0 if `formulaDefined === false`, else calls `computeCost`)
-- Returns CriterionResult[] with ALL 19 criteria (even those with null value)
-- CriterionResult shape: `{ id, label, value, sobrecosto, formulaDefined, fromDb: criterion.dataSource === 'db' }`
-
-### aggregateCosts(results: CriterionResult[], context: EvalContext): AggregatedResult
-- Sums sobrecosto of results where `formulaDefined === true` AND `value !== null`
-- Returns: `{ totalSobrecosto, capexTotal: context.baseCapex + totalSobrecosto, breakdown: results }`
-
-## Exact implementation
-
-Create `src/engine/evaluatorEngine.ts`:
-```typescript
-import type { CriterionModule, CriterionValue, EvalContext, CriterionResult, AggregatedResult } from '@/types'
-
-type CriterionValues = Record<string, CriterionValue>
-
-let _cachedCriteria: CriterionModule[] | null = null
-
-export function loadCriteria(): CriterionModule[] {
-  if (_cachedCriteria) return _cachedCriteria
-
-  const modules = import.meta.glob('../criteria/*.ts', { eager: true }) as Record<
-    string,
-    { default: CriterionModule }
-  >
-
-  _cachedCriteria = Object.values(modules)
-    .map(m => m.default)
-    .filter(Boolean)
-
-  return _cachedCriteria
-}
-
-export function evaluateCriteria(
-  values: CriterionValues,
-  context: EvalContext,
-): CriterionResult[] {
-  const criteria = loadCriteria()
-
-  return criteria.map(criterion => {
-    const value = values[criterion.id] ?? null
-    const sobrecosto = criterion.formulaDefined
-      ? criterion.computeCost(value, context)
-      : 0
-
-    return {
-      id: criterion.id,
-      label: criterion.label,
-      value,
-      sobrecosto,
-      formulaDefined: criterion.formulaDefined,
-      fromDb: criterion.dataSource === 'db',
-    }
+describe('npv', () => {
+  it('calcula el valor presente neto con flujos simples', () => {
+    // -1000 hoy, +600 año1, +600 año2, al 10% -> NPV ≈ 41.32
+    const resultado = npv(0.10, [600, 600]) - 1000
+    expect(resultado).toBeCloseTo(41.32, 1)
   })
+})
+
+describe('irr', () => {
+  it('calcula la tasa que hace VPN=0 para un flujo simple', () => {
+    // -1000, +1100 -> IRR = 10%
+    expect(irr([-1000, 1100])).toBeCloseTo(0.10, 4)
+  })
+
+  it('calcula IRR para un flujo de varios períodos', () => {
+    // -1000, +300, +400, +500, +600 -> IRR conocida ≈ 24.89%
+    expect(irr([-1000, 300, 400, 500, 600])).toBeCloseTo(0.2489, 3)
+  })
+})
+```
+
+- [ ] **Step 2b: Correr el test para verificar que falla**
+
+```bash
+cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
+npx vitest run financialMath
+```
+
+Expected: FAIL — `Cannot find module '../financialMath'`.
+
+- [ ] **Step 3: Implementar `financialMath.ts`**
+
+```ts
+// npv replica Excel NPV(): descuenta cashflows[0] a t=1, cashflows[1] a t=2, etc.
+// (NO incluye el flujo del año 0 — ese se suma aparte, igual que en el Excel: NPV(...)+C38)
+export function npv(rate: number, cashflows: number[]): number {
+  return cashflows.reduce((acc, flujo, i) => acc + flujo / Math.pow(1 + rate, i + 1), 0)
 }
 
-export function aggregateCosts(
-  results: CriterionResult[],
-  context: EvalContext,
-): AggregatedResult {
-  const totalSobrecosto = results
-    .filter(r => r.formulaDefined && r.value !== null)
-    .reduce((acc, r) => acc + r.sobrecosto, 0)
+// irr: Newton-Raphson sobre la función VPN completa (cashflows[0] es el flujo en t=0)
+export function irr(cashflows: number[], guess = 0.1): number {
+  const vpnCompleto = (rate: number) =>
+    cashflows.reduce((acc, flujo, t) => acc + flujo / Math.pow(1 + rate, t), 0)
+  const derivada = (rate: number) =>
+    cashflows.reduce((acc, flujo, t) => acc - (t * flujo) / Math.pow(1 + rate, t + 1), 0)
 
-  return {
-    totalSobrecosto,
-    capexTotal: context.baseCapex + totalSobrecosto,
-    breakdown: results,
+  let rate = guess
+  for (let i = 0; i < 100; i++) {
+    const valor = vpnCompleto(rate)
+    const pendiente = derivada(rate)
+    if (Math.abs(pendiente) < 1e-12) break
+    const siguienteRate = rate - valor / pendiente
+    if (Math.abs(siguienteRate - rate) < 1e-9) return siguienteRate
+    rate = siguienteRate
   }
+  return rate
 }
 ```
 
-## Test file
+- [ ] **Step 4: Correr el test — debe pasar**
 
-Create `src/engine/__tests__/evaluatorEngine.test.ts`:
-```typescript
-import { describe, it, expect, beforeEach } from 'vitest'
-import { loadCriteria, evaluateCriteria, aggregateCosts } from '../evaluatorEngine'
-import type { EvalContext } from '@/types'
-
-const ctx: EvalContext = { baseCapex: 4_000_000_000, kWp: 1320 }
-
-beforeEach(() => {
-  // Reset cache between tests
-  // @ts-expect-error accessing module internals for test reset
-  // The cache is module-level; re-importing is not needed — glob is eager
-})
-
-describe('loadCriteria', () => {
-  it('carga exactamente 19 criterios', () => {
-    const criteria = loadCriteria()
-    expect(criteria).toHaveLength(19)
-  })
-
-  it('todos tienen id, label e inputType', () => {
-    const criteria = loadCriteria()
-    for (const c of criteria) {
-      expect(c.id).toBeTruthy()
-      expect(c.label).toBeTruthy()
-      expect(['number', 'toggle', 'select']).toContain(c.inputType)
-    }
-  })
-})
-
-describe('evaluateCriteria', () => {
-  it('calcula sobrecosto correcto para corte=100m³', () => {
-    const values = { corte: 100 }
-    const results = evaluateCriteria(values, ctx)
-    const corteResult = results.find(r => r.id === 'corte')
-    expect(corteResult?.sobrecosto).toBe(5_000_000)
-  })
-
-  it('retorna sobrecosto 0 para criterios con formulaDefined=false', () => {
-    const values = { amenazas: 'alta' }
-    const results = evaluateCriteria(values, ctx)
-    const amenazasResult = results.find(r => r.id === 'amenazas')
-    expect(amenazasResult?.sobrecosto).toBe(0)
-    expect(amenazasResult?.formulaDefined).toBe(false)
-  })
-
-  it('incluye los 19 criterios en el resultado aunque no tengan valor', () => {
-    const results = evaluateCriteria({}, ctx)
-    expect(results).toHaveLength(19)
-  })
-})
-
-describe('aggregateCosts', () => {
-  it('suma solo los criterios con formulaDefined=true y valor distinto de null', () => {
-    const values = { corte: 100, lleno: 10, pilotes: true }
-    const results = evaluateCriteria(values, ctx)
-    const aggregated = aggregateCosts(results, ctx)
-    const expected = 100 * 50_000 + 10 * 250_000 + 156_000_000
-    expect(aggregated.totalSobrecosto).toBe(expected)
-  })
-
-  it('calcula capexTotal = baseCapex + totalSobrecosto', () => {
-    const values = { corte: 100 }
-    const results = evaluateCriteria(values, ctx)
-    const aggregated = aggregateCosts(results, ctx)
-    expect(aggregated.capexTotal).toBe(ctx.baseCapex + 100 * 50_000)
-  })
-
-  it('retorna breakdown con todos los criterios', () => {
-    const results = evaluateCriteria({}, ctx)
-    const aggregated = aggregateCosts(results, ctx)
-    expect(aggregated.breakdown).toHaveLength(19)
-  })
-})
+```bash
+cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
+npx vitest run financialMath
 ```
 
-## Note on import.meta.glob in tests
-Vitest supports `import.meta.glob` natively. The glob pattern `../criteria/*.ts` is relative to the engine file location (`src/engine/`), so it correctly resolves to `src/criteria/*.ts`. This should work without extra configuration.
+Expected: PASS (3 tests).
 
-## Steps
-1. Create `src/engine/` directory
-2. Create `src/engine/__tests__/` directory
-3. Write `evaluatorEngine.ts` (exact code above)
-4. Write the test file (exact code above)
-5. Run tests: `cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend" && npx vitest run src/engine/__tests__/evaluatorEngine.test.ts`
-6. Fix any failures
-7. Commit: `cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance" && git add frontend/src/engine/ && git commit -m "feat: add modular evaluator engine with glob-based criterion loading"`
+- [ ] **Step 5: Commit**
 
-## Report Contract
-Write full report to: `C:\Users\EQUIPO\Documents\Claude\evaluador-advance\.superpowers\sdd\task-3-report.md`
+```bash
+cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance"
+git add frontend/src/engine/financialData.ts frontend/src/engine/financialMath.ts frontend/src/engine/__tests__/financialMath.test.ts
+git commit -m "feat: add IRR/NPV math utilities and macro assumption tables"
+```
 
-Return ONLY: status, commit hash(es), test summary (X/Y passing), concerns.
+---
+

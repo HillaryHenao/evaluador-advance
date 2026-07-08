@@ -1,76 +1,79 @@
-# Task 8 Brief: EvaluadorView ensamblaje
+## Task 8: Integrar el panel en `EvaluadorView.vue` y verificar en el navegador
 
-## Context
-Task 8 of 10. All components, stores, and services from Tasks 1-7 are complete. Your job: replace the EvaluadorView.vue placeholder with the real assembled view that wires together all 4 components with the evaluator store.
+**Files:**
+- Modify: `frontend/src/views/EvaluadorView.vue`
 
-## Global Constraints
-- Work in `C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend\`
-- Run `npx tsc --noEmit` to verify TypeScript compiles clean
-- Use PowerShell for commands
+**Interfaces:**
+- Consumes: `<FinancialResultsPanel />` (Task 7).
 
-## File to Modify
-- `src/views/EvaluadorView.vue` (currently a placeholder)
+- [ ] **Step 1: Agregar el import**
 
-## Implementation
+En `frontend/src/views/EvaluadorView.vue`, junto a los demás imports de componentes:
 
-Replace `src/views/EvaluadorView.vue` entirely with:
+```ts
+import FinancialResultsPanel from '@/components/FinancialResultsPanel.vue'
+```
+
+- [ ] **Step 2: Ubicar el componente en el template**
+
+El layout actual es:
 
 ```vue
-<script setup lang="ts">
-import { computed } from 'vue'
-import AppHeader from '@/components/AppHeader.vue'
-import TerrainSearch from '@/components/TerrainSearch.vue'
-import CriterionCard from '@/components/CriterionCard.vue'
-import SummaryPanel from '@/components/SummaryPanel.vue'
-import { useEvaluatorStore } from '@/stores/evaluatorStore'
-import { evaluateCriteria } from '@/engine/evaluatorEngine'
-
-const store = useEvaluatorStore()
-
-const results = computed(() => evaluateCriteria(store.criterionValues, {
-  baseCapex: store.baseCapex,
-  kWp: store.kWp,
-}))
-</script>
-
-<template>
-  <div class="evaluador-layout">
-    <AppHeader />
     <div class="evaluador-body">
       <main class="evaluador-main">
-        <TerrainSearch />
-        <div class="criteria-grid">
-          <CriterionCard
-            v-for="result in results"
-            :key="result.id"
-            :result="result"
-          />
-        </div>
+        ...
       </main>
       <SummaryPanel />
     </div>
-  </div>
-</template>
-
-<style scoped>
-.evaluador-layout { display: flex; flex-direction: column; min-height: 100vh; }
-.evaluador-body { display: flex; flex: 1; overflow: hidden; }
-.evaluador-main { flex: 1; overflow-y: auto; }
-.criteria-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1rem;
-  padding: 1.25rem 1.5rem;
-}
-</style>
 ```
 
-## Steps
-1. Replace `src/views/EvaluadorView.vue` with the code above (IMPORTANT: do NOT create a new file — modify the existing one)
-2. Run `npx tsc --noEmit` — must be clean
-3. Commit: `cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance" && git add frontend/src/views/EvaluadorView.vue && git commit -m "feat: assemble EvaluadorView with full criteria grid and summary panel"`
+`.evaluador-body` ya es `display: flex`, `.evaluador-main` ya tiene `flex: 1`, y `SummaryPanel` ya trae su propio `width: 280px; min-width: 280px` — por lo que agregar una tercera columna de ancho fijo no requiere tocar ningún CSS, `FinancialResultsPanel` ya trae el mismo patrón de ancho fijo. Reemplaza ese bloque por:
 
-## Report Contract
-Write report to: `C:\Users\EQUIPO\Documents\Claude\evaluador-advance\.superpowers\sdd\task-8-report.md`
+```vue
+    <div class="evaluador-body">
+      <main class="evaluador-main">
+        ...
+      </main>
+      <SummaryPanel />
+      <FinancialResultsPanel />
+    </div>
+```
 
-Return ONLY: status, commit hash(es), one-line summary, concerns.
+(el `...` representa el contenido existente de `<main>`, que no cambia).
+
+- [ ] **Step 3: Reiniciar el servidor de desarrollo**
+
+El watcher de archivos de Vite en este entorno no siempre detecta cambios hechos por herramientas de edición — reinicia el proceso para asegurar que recoja el cambio:
+
+```bash
+# Detener el proceso que esté escuchando en el puerto 5173 y luego:
+cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
+npm run dev
+```
+
+- [ ] **Step 4: Verificar manualmente en el navegador**
+
+Abre `http://localhost:5173/`, busca el terreno **COLCEST11** (tiene arriendo y producción específica reales conocidos: 45,000,000 y 4.569 respectivamente). Confirma:
+- El panel "Resultados financieros" aparece junto al resumen de costos.
+- Muestra TIR, VPN y Payback (con y sin beneficios) con valores numéricos razonables (TIR entre 0% y 30% es un rango sano para este tipo de proyecto).
+- Cambiar cualquier criterio (por ejemplo activar Pilotes) mueve el CAPEX y el panel financiero se recalcula solo, sin recargar la página.
+
+- [ ] **Step 5: Commit**
+
+```bash
+cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance"
+git add frontend/src/views/EvaluadorView.vue
+git commit -m "feat: integrate FinancialResultsPanel into EvaluadorView"
+```
+
+---
+
+## Resumen de dependencias entre tasks
+
+```
+Task 1 (backend) ─┐
+Task 2 (tipos)  ───┼──> Task 6 (store) ──> Task 7 (panel) ──> Task 8 (integración)
+Task 3 (math/data) ─> Task 4 (flujos) ─> Task 5 (resultados) ──┘
+```
+
+Tasks 1, 2 y 3 pueden hacerse en paralelo (no dependen entre sí). Task 4 depende de Task 3. Task 5 depende de Task 4. Task 6 depende de Tasks 2 y 5. Task 7 depende de Task 6. Task 8 depende de Task 7.

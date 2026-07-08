@@ -1,19 +1,21 @@
-﻿# SDD Progress Ledger
+# SDD Progress Ledger
 
-Project: evaluador-advance
-Started: 2026-06-30
+Project: evaluador-advance — motor-financiero
+Plan: docs/superpowers/plans/2026-07-03-motor-financiero.md
+Branch: feature/motor-financiero
+Started: 2026-07-03
+Baseline commit: 814e3ff
 
+Task 1: complete (commits 814e3ff..9a50a7c, review clean, 3/4 tests — 1 pre-existing unrelated auth failure)
+Task 2: complete (commits 9a50a7c..ee9c1b7, review clean, 53/53 tests)
+Task 3: complete (commits ee9c1b7..8d9a7cb, review clean, 3/3 new tests, 56/56 total)
+Task 4: complete (commits 8d9a7cb..0275683, review clean, 3/3 focused + 59/59 total)
+Task 5: complete (commits 0275683..775d2ad, review clean, 7/7 new + 63/63 total; payback approximate ~0.5-0.7yr off from Excel, documented/accepted per plan)
+Task 6: complete (commits 775d2ad..7e2822a, review clean, 5/5 store + 65/65 total; noted store field is arriendoManual not arriendoAnual per plan's own code block)
+Task 7: complete (commits 7e2822a..eed24ee, review clean, vue-tsc clean — 2 preexisting unrelated errors only; Minor: formatCOP negative-sign display, empty-state styling — cosmetic, inherited from plan's own code)
+Task 8: complete (commits eed24ee..72fc478, review clean, 65/65 tests, backend/frontend smoke-tested)
 
-Task 1: complete (commits 9e7790e..ebfd811, review clean)
-Task 2: complete (commits ebfd811..cb4e03a, review clean, 15/15 tests)
-Task 3: complete (commits cb4e03a..5494351, review clean, 8/8 tests)
-Task 4: complete (commits 5494351..3a88eee, review clean, 3/3 tests)
-Task 5: complete (commits 3a88eee..02a4b36, review clean)
-Task 6: complete (commits 02a4b36..ef2781f, review clean, 3/3 tests)
-Task 7: complete (commits ef2781f..75a99d5, review clean)
-Task 8: complete (commits 75a99d5..09fa339, review clean)
-Task 9: complete (commits 09fa339..2ea760d, review clean, 4/4 tests) — Minor: orphaned require_auth in jwt_validator.py; require_auth missing type annotations
-Task 10: complete (commits 2ea760d..5d4cb74, review clean)
+All 8 tasks complete. Proceeding to final whole-branch review.
 
-Final whole-branch review: PASSED (commit 4232204 — 3 required fixes applied: relative API URL, nivel_tension normalization, aprovechamiento_forestal normalization)
-Branch: READY TO MERGE
+Final whole-branch review: PASSED WITH FIXES (commit a08e5d1 — payback test coverage added, 4 minor polish items addressed: payback approximation documented in code, constants consolidated, formatCOP negative-sign fixed, financialData.ts indexing note added)
+Branch: feature/motor-financiero — READY TO MERGE

@@ -1,171 +1,119 @@
-# Task 6 Brief: Terrain service + evaluator store
+## Task 6: Wire en `evaluatorStore` (kVA, arriendo/producción reactivos, financialResults)
 
-## Context
-Task 6 of 10. Tasks 1-5 complete. `useAuthStore` exists with `accessToken`. `evaluatorEngine.ts` has `loadCriteria`, `evaluateCriteria`, `aggregateCosts`. Your job: build `terrainService.ts` (HTTP call to Flask backend) and `evaluatorStore.ts` (Pinia store that ties terrain data + criterion values + computed costs together).
+**Files:**
+- Modify: `frontend/src/stores/evaluatorStore.ts`
+- Modify: `frontend/src/stores/__tests__/evaluatorStore.test.ts`
 
-## Global Constraints
-- Work in `C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend\`
-- `@` alias = `src/`
-- Tests: `npx vitest run src/stores/__tests__/evaluatorStore.test.ts`
-- All tests must pass before committing
-- Use PowerShell for commands
-- Backend URL: `http://localhost:5000` (configurable via `VITE_API_URL` env var)
+**Interfaces:**
+- Consumes: `calcularFinanzas` de `@/engine/financialEngine`.
+- Produces: `evaluatorStore.kVA: Ref<number>`, `evaluatorStore.arriendoAnual: Ref<number | null>`, `evaluatorStore.financialResults: ComputedRef<FinancialResults | null>` — consumidos por Task 7 (`FinancialResultsPanel.vue`).
 
-## Files to Create
-- `src/services/terrainService.ts`
-- `src/stores/evaluatorStore.ts`
-- `src/stores/__tests__/evaluatorStore.test.ts`
+- [ ] **Step 1: Escribir el test (falla primero)**
 
-## Implementation
+Agrega a `frontend/src/stores/__tests__/evaluatorStore.test.ts`:
 
-### src/services/terrainService.ts
-```typescript
-import axios from 'axios'
-import type { TerrainData } from '@/types'
-
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:5000'
-
-export async function fetchTerrainData(code: string, token: string): Promise<TerrainData> {
-  const response = await axios.get<TerrainData>(`${API_BASE}/api/terrain/${code}`, {
-    headers: { Authorization: `Bearer ${token}` },
+```ts
+describe('financialResults', () => {
+  it('es null si no hay producción específica ni arriendo cargados', () => {
+    const store = useEvaluatorStore()
+    expect(store.financialResults).toBeNull()
   })
-  return response.data
-}
+
+  it('calcula TIR una vez cargados terrainData y kVA por defecto', async () => {
+    vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue(mockTerrain)
+    const store = useEvaluatorStore()
+    await store.fetchTerrain('COLCEST5')
+    expect(store.financialResults).not.toBeNull()
+    expect(store.financialResults?.tir).toBeGreaterThan(0)
+  })
+})
 ```
 
-### src/stores/evaluatorStore.ts
-```typescript
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { fetchTerrainData } from '@/services/terrainService'
-import { loadCriteria, evaluateCriteria, aggregateCosts } from '@/engine/evaluatorEngine'
-import { useAuthStore } from '@/stores/authStore'
-import type { TerrainData, CriterionValue, AggregatedResult } from '@/types'
+- [ ] **Step 2: Correr el test para verificar que falla**
 
-type CriterionValues = Record<string, CriterionValue>
+```bash
+cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
+npx vitest run evaluatorStore
+```
 
-const BASE_CAPEX_DEFAULT = 4_000_000_000
-const KWP_DEFAULT = 1320
+Expected: FAIL — `store.financialResults` es `undefined`, no `null`.
 
-export const useEvaluatorStore = defineStore('evaluador', () => {
-  const terrainData = ref<TerrainData | null>(null)
-  const criterionValues = ref<CriterionValues>({})
-  const baseCapex = ref(BASE_CAPEX_DEFAULT)
-  const kWp = ref(KWP_DEFAULT)
-  const loading = ref(false)
-  const error = ref<string | null>(null)
+- [ ] **Step 3: Leer el estado actual de `evaluatorStore.ts`**
 
-  const context = computed(() => ({ baseCapex: baseCapex.value, kWp: kWp.value }))
+Antes de editar, revisa el archivo completo para mantener el estilo existente (composables Pinia con `ref`/`computed`).
 
-  const aggregated = computed<AggregatedResult>(() => {
-    const results = evaluateCriteria(criterionValues.value, context.value)
-    return aggregateCosts(results, context.value)
+- [ ] **Step 4: Implementar en `evaluatorStore.ts`**
+
+Agrega el import al inicio del archivo:
+
+```ts
+import { calcularFinanzas } from '@/engine/financialEngine'
+import type { FinancialResults } from '@/types'
+```
+
+Dentro de `defineStore`, junto a la declaración de `kWp`:
+
+```ts
+  const kVA = ref(1000)
+  const arriendoManual = ref<number | null>(null)
+```
+
+Agrega el computed `financialResults` (ubícalo junto al computed `aggregated` existente):
+
+```ts
+  const financialResults = computed<FinancialResults | null>(() => {
+    const produccionEspecifica = terrainData.value?.produccion_especifica
+    const arriendoAnual = arriendoManual.value ?? terrainData.value?.arriendo_anual
+    if (!produccionEspecifica || !arriendoAnual) return null
+    return calcularFinanzas({
+      capex: aggregated.value.capexTotal,
+      kWp: kWp.value,
+      kVA: kVA.value,
+      produccionEspecifica,
+      arriendoAnual,
+    })
   })
+```
 
-  async function fetchTerrain(code: string): Promise<void> {
-    loading.value = true
-    error.value = null
-    try {
-      const auth = useAuthStore()
-      const data = await fetchTerrainData(code, auth.accessToken ?? '')
-      terrainData.value = data
+Y actualiza el `return` del store (al final de `defineStore`), agregando los 3 nuevos campos. Reemplaza:
 
-      const criteria = loadCriteria()
-      const dbValues: CriterionValues = {}
-      for (const criterion of criteria) {
-        if (criterion.dbField && data[criterion.dbField as keyof TerrainData] !== undefined) {
-          dbValues[criterion.id] = data[criterion.dbField as keyof TerrainData] as CriterionValue
-        }
-      }
-      criterionValues.value = { ...criterionValues.value, ...dbValues }
-    } catch (e) {
-      error.value = 'No se encontró el terreno o error de conexión.'
-      terrainData.value = null
-    } finally {
-      loading.value = false
-    }
-  }
-
-  function setCriterionValue(id: string, value: CriterionValue): void {
-    criterionValues.value = { ...criterionValues.value, [id]: value }
-  }
-
-  function reset(): void {
-    terrainData.value = null
-    criterionValues.value = {}
-    error.value = null
-  }
-
+```ts
   return {
     terrainData, criterionValues, baseCapex, kWp,
     loading, error, aggregated, fetchTerrain, setCriterionValue, reset,
   }
-})
 ```
 
-### src/stores/__tests__/evaluatorStore.test.ts
-```typescript
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { setActivePinia, createPinia } from 'pinia'
-import { useEvaluatorStore } from '../evaluatorStore'
-import * as terrainService from '@/services/terrainService'
-import type { TerrainData } from '@/types'
+con:
 
-const mockTerrain: TerrainData = {
-  code: 'COLCEST5',
-  name: 'Test Proyecto',
-  municipality: 'Aguachica',
-  distancia_via: 120,
-  distancia_red: 350,
-  or: 'AFINIA',
-  nivel_tension: '34.5 kV',
-  cluster: 2,
-  tipo_estructura: 'Tracker',
-  ocupacion_cauce: false,
-  servidumbre: 'own',
-  aprovechamiento_forestal: 'Exonerado',
-  coexistencias: false,
-}
-
-beforeEach(() => {
-  setActivePinia(createPinia())
-})
-
-describe('useEvaluatorStore', () => {
-  it('fetchTerrain autocompletea campos DB en criterionValues', async () => {
-    vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue(mockTerrain)
-    const store = useEvaluatorStore()
-    await store.fetchTerrain('COLCEST5')
-    expect(store.criterionValues['distancia_via']).toBe(120)
-    expect(store.criterionValues['distancia_red']).toBe(350)
-    expect(store.criterionValues['or']).toBe('AFINIA')
-  })
-
-  it('setCriterionValue actualiza el valor y recalcula', () => {
-    const store = useEvaluatorStore()
-    store.setCriterionValue('corte', 100)
-    expect(store.criterionValues['corte']).toBe(100)
-    const corteResult = store.aggregated.breakdown.find(r => r.id === 'corte')
-    expect(corteResult?.sobrecosto).toBe(5_000_000)
-  })
-
-  it('aggregated.capexTotal incluye baseCapex + sobrecostos', () => {
-    const store = useEvaluatorStore()
-    store.setCriterionValue('corte', 100)
-    expect(store.aggregated.capexTotal).toBe(store.baseCapex + 5_000_000)
-  })
-})
+```ts
+  return {
+    terrainData, criterionValues, baseCapex, kWp, kVA, arriendoManual,
+    loading, error, aggregated, financialResults, fetchTerrain, setCriterionValue, reset,
+  }
 ```
 
-## Steps
-1. Create `src/services/terrainService.ts`
-2. Create `src/stores/evaluatorStore.ts`
-3. Create `src/stores/__tests__/evaluatorStore.test.ts`
-4. Run tests: `cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend" && npx vitest run src/stores/__tests__/evaluatorStore.test.ts`
-5. Fix any failures
-6. Commit: `cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance" && git add frontend/src/services/terrainService.ts frontend/src/stores/evaluatorStore.ts "frontend/src/stores/__tests__/evaluatorStore.test.ts" && git commit -m "feat: add terrain service and evaluator Pinia store with reactivity"`
+- [ ] **Step 5: Correr el test — iterar hasta que pase**
 
-## Report Contract
-Write report to: `C:\Users\EQUIPO\Documents\Claude\evaluador-advance\.superpowers\sdd\task-6-report.md`
+```bash
+cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
+npx vitest run evaluatorStore
+```
 
-Return ONLY: status, commit hash(es), test summary (X/Y passing), concerns.
+Expected: PASS.
+
+- [ ] **Step 6: Correr toda la suite y commit**
+
+```bash
+cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
+npx vitest run
+```
+
+```bash
+cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance"
+git add frontend/src/stores/evaluatorStore.ts frontend/src/stores/__tests__/evaluatorStore.test.ts
+git commit -m "feat: wire financial engine into evaluatorStore reactively"
+```
+
+---
+

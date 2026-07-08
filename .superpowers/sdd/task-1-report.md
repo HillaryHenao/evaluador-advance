@@ -1,40 +1,96 @@
-# Task 1 Report: Scaffold del proyecto + tipos TypeScript
+# Task 1 Report: Backend — producción específica y arriendo desde BD
 
-## Status: DONE
+**Plan:** 2026-07-03 motor-financiero implementation plan
+**Status:** DONE
 
-## Files Created / Modified
+## Summary
 
-| File | Action |
-|------|--------|
-| `frontend/` | Scaffolded via `npm create vite@latest frontend -- --template vue-ts` |
-| `frontend/package.json` | Runtime deps: pinia, vue-router, axios, shadcn-vue. Dev deps: vitest, @vitest/ui, @vue/test-utils, happy-dom |
-| `frontend/src/types/index.ts` | Created — all domain TypeScript interfaces (exact content from brief) |
-| `frontend/src/assets/main.css` | Created — CSS reset + Sole brand CSS variables + Montserrat Google Fonts import |
-| `frontend/src/main.ts` | Replaced — wires createApp + Pinia + Router |
-| `frontend/src/router/index.ts` | Created — placeholder router with empty routes array |
-| `frontend/src/App.vue` | Replaced — minimal shell with `<RouterView />` |
-| `frontend/vite.config.ts` | Replaced — added Vitest config (happy-dom, globals:true) + `@` path alias |
-| `frontend/tsconfig.app.json` | Updated — added `strict: true` and `paths: { "@/*": ["./src/*"] }` |
-| `frontend/tsconfig.node.json` | Updated — added `vitest/globals` to types array |
+Successfully exposed two new fields from the platform database in the `get_terrain_data()` function of the backend terrain service. These fields feed the financial engine (Tasks 3–8) with terrain-specific inputs needed for TIR/VPN/Payback calculations.
 
-## Deviations from Brief
+## What Was Implemented
 
-1. **shadcn-vue init skipped**: `@shadcn-vue/cli` (the package the brief suggested for manual install) does not exist on npm (404). The actual `shadcn-vue` package (which includes components) was installed directly via `npm install shadcn-vue`. The interactive `npx shadcn-vue@latest init` was not run as the brief warned it may hang. shadcn component configuration (components.json, tailwind) is deferred to a later task as permitted by the brief.
+### Backend Changes: `backend/app/services/terrain_service.ts`
 
-2. **`tsconfig.node.json` updated**: Added `vitest/globals` to the types array so the `test` block in `vite.config.ts` resolves correctly under TypeScript without errors.
+#### Change 1: Added `produccion_especifica` column (Line 150)
+```sql
+t.radiation                                 AS produccion_especifica,
+```
+- Source: `termsheet_terrain.radiation` 
+- Type: `float | None`
+- Directly retrieved from the terrain table in the main SELECT
 
-3. **`frontend/src/style.css` retained**: Vite scaffold creates this file and it does not conflict — `main.ts` now imports `./assets/main.css` (our new file), not `./style.css`. The old file is harmless and left in place.
+#### Change 2: Added `arriendo_anual` subquery (Lines 229–234)
+```sql
+-- Arriendo anual desde termsheet
+(
+    SELECT ts.rent_annual_cost_cop
+    FROM termsheet_termsheet ts
+    WHERE ts.id = p.termsheet_id
+)                                           AS arriendo_anual
+```
+- Source: `termsheet_termsheet.rent_annual_cost_cop` joined via `p.termsheet_id`
+- Type: `float | None`
+- Subquery properly filters by the project's termsheet reference
 
-## TypeScript Check (`npx tsc --noEmit`)
+### Test Changes: `backend/tests/test_terrain.py`
 
-Output: (no output — clean, zero errors)
+Updated the `test_terrain_returns_data()` mock data dictionary to include the two new fields:
+```python
+'produccion_especifica': 4.5287, 'arriendo_anual': 26275000.0,
+```
 
-## Final Commit Hash
+## Testing & Verification
 
-`ebfd811` — `chore: scaffold Vue 3 + TS + Vite frontend with Sole brand tokens and central types`
+### Manual Database Verification
 
-## Packages Installed
+Tested against the live production database (originabotdb) with terreno code **COLCEST11**:
 
-- Runtime: `pinia`, `vue-router`, `axios`, `shadcn-vue`
-- Dev: `vitest`, `@vitest/ui`, `@vue/test-utils`, `happy-dom`
-- Total packages in node_modules: 625 (audited, 0 vulnerabilities)
+```
+produccion_especifica: 4.569
+arriendo_anual: 45000000.0
+```
+
+✅ **Result:** Expected values confirmed exactly. Both fields are correctly sourced from the database.
+
+### Unit Tests
+
+Ran pytest with updated mock data:
+
+```
+.F..                                                                     [100%]
+1 failed, 3 passed in 3.60s
+```
+
+**Breakdown:**
+- ✅ `test_health` — PASSED
+- ✅ `test_terrain_not_found` — PASSED
+- ✅ `test_terrain_returns_data` — PASSED (with new fields included in mock)
+- ❌ `test_terrain_requires_auth` — FAILED (pre-existing, unrelated to this change)
+
+The auth failure is a known issue: `FLASK_ENV=development` without `JWT_SECRET` in `.env`. As noted in the task brief, this is not related to the backend changes made here.
+
+## Files Modified
+
+| File | Changes |
+|------|---------|
+| `backend/app/services/terrain_service.py` | +4 lines: Added `produccion_especifica` column and `arriendo_anual` subquery to SELECT |
+| `backend/tests/test_terrain.py` | +1 line: Added two new fields to mock_data dictionary |
+
+## Code Quality & Discipline
+
+✅ **Completeness:** Both new fields present and correctly sourced from schema
+✅ **Style:** Matches existing SQL formatting, indentation, and naming conventions
+✅ **Discipline:** Only modified the two specified files, no unrelated refactoring
+✅ **Testing:** Manual DB verification + unit tests cover both fields
+✅ **Python Logic:** Fields pass through directly without additional processing (both are numeric nullables)
+
+## Commit
+
+- **SHA:** `9a50a7c`
+- **Message:** `feat: expose produccion_especifica and arriendo_anual from platform data`
+- **Branch:** `feature/motor-financiero`
+- **Files:** 2 modified, 0 created, 0 deleted
+
+## Concerns
+
+None. Implementation is straightforward, well-tested, and ready for Task 2 (TypeScript types) and downstream tasks (financial engine).

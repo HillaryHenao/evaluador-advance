@@ -1,206 +1,154 @@
-# Task 5 Brief: Vue Router + LoginView
+## Task 5: Beneficio tributario + resultados finales (TIR/VPN/Payback) + golden master
 
-## Context
-Task 5 of 10. Tasks 1-4 complete. `useAuthStore` exists in `src/stores/authStore.ts`. Your job: replace the placeholder router with a real one that has an auth guard, build LoginView.vue with Solé brand styling, and create a placeholder EvaluadorView.vue.
+**Files:**
+- Modify: `frontend/src/engine/financialEngine.ts`
+- Modify: `frontend/src/engine/__tests__/financialEngine.test.ts`
 
-## Global Constraints
-- Work in `C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend\`
-- No tests required for this task (UI task — test in browser manually)
-- Colors: Navy `#152644`, Navy-light `#1e3459`, Lemony `#E2FF65`, Nashville `#8EC3E1`
-- Font: Montserrat (already imported via main.css)
-- Use PowerShell for commands
+**Interfaces:**
+- Consumes: `calcularFlujosDeCaja` (Task 4), `irr`, `npv` (Task 3).
+- Produces: `calcularFinanzas(inputs: FinancialInputs): FinancialResults` — consumida por Task 6 (`evaluatorStore`).
 
-## Files to Modify/Create
-- **Modify**: `src/router/index.ts` (currently a placeholder with empty routes)
-- **Create**: `src/views/LoginView.vue`
-- **Create**: `src/views/EvaluadorView.vue` (placeholder only)
+- [ ] **Step 1: Escribir el test golden-master (falla primero)**
 
-## Implementation
+Agrega a `frontend/src/engine/__tests__/financialEngine.test.ts`:
 
-### src/router/index.ts (replace existing placeholder)
-```typescript
-import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '@/stores/authStore'
-import LoginView from '@/views/LoginView.vue'
-import EvaluadorView from '@/views/EvaluadorView.vue'
+```ts
+import { calcularFinanzas } from '../financialEngine'
 
-const router = createRouter({
-  history: createWebHistory(),
-  routes: [
-    { path: '/login', name: 'login', component: LoginView },
-    { path: '/', name: 'evaluador', component: EvaluadorView, meta: { requiresAuth: true } },
-    { path: '/:pathMatch(.*)*', redirect: '/' },
-  ],
+describe('calcularFinanzas — golden master contra el Excel', () => {
+  const resultado = calcularFinanzas(INPUTS_EXCEL)
+
+  it('TIR ≈ 11.01%', () => {
+    expect(resultado.tir).toBeCloseTo(0.1100882832, 2)
+  })
+
+  it('TIR con beneficios tributarios ≈ 14.20%', () => {
+    expect(resultado.tirConBeneficios).toBeCloseTo(0.1420435955, 2)
+  })
+
+  it('VPN ≈ $391.8M', () => {
+    expect(resultado.vpn).toBeCloseTo(391_839_623.5, -6)
+  })
+
+  it('VPN con beneficios ≈ $1,576.1M', () => {
+    expect(resultado.vpnConBeneficios).toBeCloseTo(1_576_145_841, -6)
+  })
 })
-
-router.beforeEach((to) => {
-  const auth = useAuthStore()
-  if (to.meta.requiresAuth && !auth.isAuthenticated) {
-    return { name: 'login' }
-  }
-  if (to.name === 'login' && auth.isAuthenticated) {
-    return { name: 'evaluador' }
-  }
-})
-
-export default router
 ```
 
-### src/views/LoginView.vue
-```vue
-<script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/authStore'
+- [ ] **Step 2: Correr el test para verificar que falla**
 
-const username = ref('')
-const password = ref('')
-const error = ref('')
-const loading = ref(false)
+```bash
+cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
+npx vitest run financialEngine
+```
 
-const router = useRouter()
-const auth = useAuthStore()
+Expected: FAIL — `calcularFinanzas is not a function` (o similar).
 
-async function handleLogin() {
-  error.value = ''
-  loading.value = true
-  try {
-    await auth.login(username.value, password.value)
-    await router.push({ name: 'evaluador' })
-  } catch {
-    error.value = 'Credenciales incorrectas. Intenta de nuevo.'
-  } finally {
-    loading.value = false
+- [ ] **Step 3: Implementar el beneficio tributario y `calcularFinanzas`**
+
+Agrega al inicio de `financialEngine.ts`, junto al import existente de `financialData`:
+
+```ts
+import { irr, npv } from './financialMath'
+import type { FinancialResults } from '@/types'
+```
+
+Y agrega al final del archivo (después de `calcularFlujosDeCaja`):
+
+```ts
+const DEPRECIACION_ANIOS = 15
+const TASA_IMPUESTO_RENTA = 0.35
+const TASA_DESCUENTO_VPN = 0.10
+
+function calcularBeneficioTributario(capex: number): number[] {
+  const beneficio: number[] = new Array(N_PERIODOS).fill(0)
+  const depreciacionAnual = capex / DEPRECIACION_ANIOS
+  const depreciacionAceleradaAnual = (capex * 0.5) / DEPRECIACION_ANIOS
+
+  for (let k = 1; k < N_PERIODOS; k++) {
+    const anio = AÑO_BASE + k
+    let total = 0
+    // Depreciación línea recta (años base+1 .. base+15)
+    if (anio < AÑO_BASE + 1 + DEPRECIACION_ANIOS) {
+      total += depreciacionAnual * TASA_IMPUESTO_RENTA
+    }
+    // Depreciación acelerada sobre 50% del capex, desplazada 1 año (años base+2 .. base+16)
+    if (anio - 1 < AÑO_BASE + 1 + DEPRECIACION_ANIOS && k >= 2) {
+      total += depreciacionAceleradaAnual * TASA_IMPUESTO_RENTA
+    }
+    beneficio[k] = total
+  }
+  return beneficio
+}
+
+function calcularPayback(flujos: number[]): number {
+  // Replica el conteo del Excel (filas 45-47): el año de inversión (índice 0) siempre
+  // contribuye 1 año completo; los años siguientes contribuyen 1 si aún no se recupera
+  // la inversión, una fracción en el año que cruza a positivo, y 0 después.
+  let contador = 1
+  let remanente = -flujos[0]
+  for (let k = 1; k < flujos.length; k++) {
+    if (remanente <= 0) continue
+    const remanenteAnterior = remanente
+    remanente = remanente - flujos[k]
+    if (remanente > 0) {
+      contador += 1
+    } else {
+      contador += remanenteAnterior / flujos[k]
+    }
+  }
+  return contador
+}
+
+export function calcularFinanzas(inputs: FinancialInputs): FinancialResults {
+  const { flujoInversionista } = calcularFlujosDeCaja(inputs)
+  const beneficioTributario = calcularBeneficioTributario(inputs.capex)
+  const flujoInversionistaConBeneficios = flujoInversionista.map((f, i) => f + beneficioTributario[i])
+
+  // NPV Excel: NPV(10%, años 1..31) + flujo año 0 (columnas D:AH del Excel = índices 1..31)
+  const vpn = flujoInversionista[0] + npv(TASA_DESCUENTO_VPN, flujoInversionista.slice(1, 32))
+  const vpnConBeneficios =
+    flujoInversionistaConBeneficios[0] + npv(TASA_DESCUENTO_VPN, flujoInversionistaConBeneficios.slice(1, 32))
+
+  return {
+    tir: irr(flujoInversionista),
+    tirConBeneficios: irr(flujoInversionistaConBeneficios),
+    vpn,
+    vpnConBeneficios,
+    paybackAnios: calcularPayback(flujoInversionista),
+    paybackConBeneficiosAnios: calcularPayback(flujoInversionistaConBeneficios),
   }
 }
-</script>
-
-<template>
-  <div class="login-container">
-    <div class="login-card">
-      <div class="login-logo">
-        <span class="login-logo-text">Solé</span>
-      </div>
-      <h1 class="login-title">Evaluador Advance</h1>
-      <form @submit.prevent="handleLogin" class="login-form">
-        <div class="login-field">
-          <label for="username">Usuario</label>
-          <input
-            id="username"
-            v-model="username"
-            type="text"
-            placeholder="usuario"
-            autocomplete="username"
-            required
-          />
-        </div>
-        <div class="login-field">
-          <label for="password">Contraseña</label>
-          <input
-            id="password"
-            v-model="password"
-            type="password"
-            placeholder="••••••••"
-            autocomplete="current-password"
-            required
-          />
-        </div>
-        <p v-if="error" class="login-error">{{ error }}</p>
-        <button type="submit" :disabled="loading" class="login-btn">
-          {{ loading ? 'Ingresando...' : 'Ingresar' }}
-        </button>
-      </form>
-    </div>
-  </div>
-</template>
-
-<style scoped>
-.login-container {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--color-navy);
-}
-.login-card {
-  background-color: var(--color-navy-light);
-  border: 1px solid rgba(226, 255, 101, 0.2);
-  border-radius: 12px;
-  padding: 2.5rem;
-  width: 100%;
-  max-width: 380px;
-}
-.login-logo {
-  text-align: center;
-  margin-bottom: 0.5rem;
-}
-.login-logo-text {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--color-lemony);
-  letter-spacing: -0.02em;
-}
-.login-title {
-  text-align: center;
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--color-nashville);
-  margin-bottom: 2rem;
-}
-.login-form { display: flex; flex-direction: column; gap: 1rem; }
-.login-field { display: flex; flex-direction: column; gap: 0.4rem; }
-.login-field label { font-size: 0.85rem; font-weight: 500; color: var(--color-nashville); }
-.login-field input {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 6px;
-  padding: 0.6rem 0.8rem;
-  color: var(--color-white);
-  font-family: 'Montserrat', sans-serif;
-  font-size: 0.9rem;
-  outline: none;
-  transition: border-color 0.2s;
-}
-.login-field input:focus { border-color: var(--color-lemony); }
-.login-error { color: #f87171; font-size: 0.82rem; text-align: center; }
-.login-btn {
-  margin-top: 0.5rem;
-  background-color: var(--color-lemony);
-  color: var(--color-navy);
-  border: none;
-  border-radius: 6px;
-  padding: 0.7rem;
-  font-family: 'Montserrat', sans-serif;
-  font-weight: 700;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
-.login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-</style>
 ```
 
-### src/views/EvaluadorView.vue (placeholder)
-```vue
-<script setup lang="ts">
-</script>
+- [ ] **Step 4: Correr el test — iterar hasta que pase**
 
-<template>
-  <div style="padding: 2rem; color: white;">
-    <p>Evaluador (placeholder — Task 8)</p>
-  </div>
-</template>
+```bash
+cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
+npx vitest run financialEngine
 ```
 
-## Steps
-1. Replace `src/router/index.ts` with the real router (exact code above)
-2. Create `src/views/LoginView.vue` (exact code above)
-3. Create `src/views/EvaluadorView.vue` (placeholder)
-4. Run TypeScript check: `cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend" && npx tsc --noEmit`
-5. Fix any TS errors
-6. Commit: `cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance" && git add frontend/src/router/ frontend/src/views/ && git commit -m "feat: add Vue Router with auth guard and LoginView"`
+Expected: todos los tests pasan. Si TIR/VPN no coinciden dentro de tolerancia, depurar comparando flujo por flujo contra la hoja "Flujo de caja" del Excel original (`Retail Modelo financiero - Plantilla Evaluador.xlsx`) fila 38 (sin beneficios) y fila 43 (con beneficios) — no contra el payback, que es el resultado más sensible a la convención exacta de fracción-de-año del Excel y puede quedar aproximado (ver Nota abajo).
 
-## Report Contract
-Write report to: `C:\Users\EQUIPO\Documents\Claude\evaluador-advance\.superpowers\sdd\task-5-report.md`
+**Nota sobre Payback:** El deliverable principal pedido por el usuario es la TIR; VPN es el segundo más importante. Si el payback no cuadra exactamente con el Excel (9 y 7 años) después de intentar la implementación de arriba, es aceptable dejarlo con una tolerancia más amplia (±1 año) y anotarlo como conocido en el commit — no bloquear la entrega de TIR/VPN por esto.
 
-Return ONLY: status, commit hash(es), one-line summary, concerns.
+- [ ] **Step 5: Correr toda la suite de frontend**
+
+```bash
+cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
+npx vitest run
+```
+
+Expected: todos los tests pasan (los existentes + los nuevos de esta task).
+
+- [ ] **Step 6: Commit**
+
+```bash
+cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance"
+git add frontend/src/engine/financialEngine.ts frontend/src/engine/__tests__/financialEngine.test.ts
+git commit -m "feat: add tax benefit calculation and TIR/VPN/Payback outputs"
+```
+
+---
+
