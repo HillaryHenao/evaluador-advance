@@ -21,7 +21,7 @@ describe('loadCriteria', () => {
     for (const c of criteria) {
       expect(c.id).toBeTruthy()
       expect(c.label).toBeTruthy()
-      expect(['number', 'toggle', 'select']).toContain(c.inputType)
+      expect(['number', 'toggle', 'select', 'checklist']).toContain(c.inputType)
     }
   })
 })
@@ -39,7 +39,7 @@ describe('evaluateCriteria', () => {
     const results = evaluateCriteria(values, ctx)
     const result = results.find(r => r.id === 'obras_hidraulicas')
     expect(result?.sobrecosto).toBe(0)
-    expect(result?.formulaDefined).toBe(false)
+    expect(result?.formulaDefined).toBe(true)
   })
 
   it('incluye los 18 criterios en el resultado aunque no tengan valor', () => {

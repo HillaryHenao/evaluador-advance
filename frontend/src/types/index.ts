@@ -1,4 +1,16 @@
-export type CriterionValue = number | boolean | string | null
+export interface ObraHidraulicaItem {
+  activo: boolean
+  cantidad: number | null
+}
+
+export interface ObrasHidraulicasValue {
+  canal_concreto: ObraHidraulicaItem
+  cuneta_via: ObraHidraulicaItem
+  box_culvert: ObraHidraulicaItem
+  alcantarilla_cruce: ObraHidraulicaItem
+}
+
+export type CriterionValue = number | boolean | string | null | ObrasHidraulicasValue
 
 export interface EvalContext {
   baseCapex: number
@@ -38,10 +50,19 @@ export interface SelectOption {
   label: string
 }
 
+export interface ChecklistItemDef {
+  key: string
+  label: string
+  unit: string
+  group: 'metro' | 'fijo'
+  groupLabel: string
+  tarifa: number
+}
+
 export interface CriterionModule {
   id: string
   label: string
-  inputType: 'number' | 'toggle' | 'select'
+  inputType: 'number' | 'toggle' | 'select' | 'checklist'
   unit?: string
   dataSource: 'manual' | 'db' | 'db_or_manual'
   dbField?: string
@@ -49,6 +70,7 @@ export interface CriterionModule {
   formulaDefined: boolean
   category: CriterionCategory
   riskType?: RiskType
+  checklistItems?: ChecklistItemDef[]
   computeCost: (value: CriterionValue, context: EvalContext) => number
 }
 
