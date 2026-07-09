@@ -10,6 +10,7 @@ import aprovechamientoForestal from '../aprovechamiento_forestal'
 import ocupacionCauce from '../ocupacion_cauce'
 import distanciaRed from '../distancia_red'
 import distanciaVia from '../distancia_via'
+import obrasHidraulicas from '../obras_hidraulicas'
 
 const ctx = { baseCapex: 4_000_000_000, kWp: 1320 }
 
@@ -157,5 +158,56 @@ describe('distancia_via', () => {
   })
   it('retorna 0 para valor nulo', () => {
     expect(distanciaVia.computeCost(null, ctx)).toBe(0)
+  })
+})
+
+describe('obras_hidraulicas', () => {
+  const vacio = {
+    canal_concreto: { activo: false, cantidad: null },
+    cuneta_via: { activo: false, cantidad: null },
+    box_culvert: { activo: false, cantidad: null },
+    alcantarilla_cruce: { activo: false, cantidad: null },
+  }
+
+  it('calcula 40m de canal en concreto a 1.300.000/m', () => {
+    const value = { ...vacio, canal_concreto: { activo: true, cantidad: 40 } }
+    expect(obrasHidraulicas.computeCost(value, ctx)).toBe(52_000_000)
+  })
+
+  it('suma varios tipos activos (canal + box culvert)', () => {
+    const value = {
+      ...vacio,
+      canal_concreto: { activo: true, cantidad: 40 },
+      box_culvert: { activo: true, cantidad: 1 },
+    }
+    expect(obrasHidraulicas.computeCost(value, ctx)).toBe(52_000_000 + 170_000_000)
+  })
+
+  it('ignora la cantidad de un ítem no activo', () => {
+    const value = { ...vacio, alcantarilla_cruce: { activo: false, cantidad: 3 } }
+    expect(obrasHidraulicas.computeCost(value, ctx)).toBe(0)
+  })
+
+  it('ignora un ítem activo con cantidad NaN en vez de corromper el total', () => {
+    const value = { ...vacio, canal_concreto: { activo: true, cantidad: NaN } }
+    expect(obrasHidraulicas.computeCost(value, ctx)).toBe(0)
+  })
+
+  it('retorna 0 para valor nulo', () => {
+    expect(obrasHidraulicas.computeCost(null, ctx)).toBe(0)
+  })
+
+  it('tiene formulaDefined true y category fijo', () => {
+    expect(obrasHidraulicas.formulaDefined).toBe(true)
+    expect(obrasHidraulicas.category).toBe('fijo')
+  })
+
+  it('define checklistItems en el orden canal, cuneta, box culvert, alcantarilla', () => {
+    expect(obrasHidraulicas.checklistItems?.map(item => item.key)).toEqual([
+      'canal_concreto',
+      'cuneta_via',
+      'box_culvert',
+      'alcantarilla_cruce',
+    ])
   })
 })

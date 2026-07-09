@@ -1,101 +1,109 @@
-# Task 2 Report: Tipos TypeScript para el motor financiero
+# Task 2 Report: Checklist UI in CriterionCard.vue
 
 ## Summary
-
-Successfully implemented all TypeScript type definitions for the financial engine module. Added 2 new fields to TerrainData interface, created 2 new financial engine interfaces (FinancialInputs and FinancialResults), and updated the test fixture to include the new fields.
+Successfully implemented all 5 steps of Task 2: added grouped checklist UI for the `obras_hidraulicas` criterion in `CriterionCard.vue`.
 
 ## Implementation Details
 
-### Step 1: TerrainData Interface Updates
-Added two new nullable number fields to the existing TerrainData interface in `frontend/src/types/index.ts`:
-- `produccion_especifica: number | null` (line 74)
-- `arriendo_anual: number | null` (line 75)
+### Step 1: Type Import
+✓ Updated line 5 to import `ObrasHidraulicasValue` and `ObraHidraulicaItem` from `@/types`
 
-These fields represent platform-specific production metrics and annual lease costs required by the financial engine.
+### Step 2: Checklist Computeds and Handlers
+✓ Added after `accentColor` computed (lines 18-59):
+- `EMPTY_OBRAS_HIDRAULICAS` constant with all 4 correct item keys:
+  - `canal_concreto`
+  - `cuneta_via`
+  - `box_culvert`
+  - `alcantarilla_cruce`
+- `checklistValue` computed: reads `props.result.value` and falls back to empty state
+- `checklistItem(key)` helper: retrieves item data by key
+- `checklistGroups` computed: groups items by `item.group`, preserving `groupLabel` and order
+- `handleChecklistToggle(key, event)`: updates `activo` property and calls store
+- `handleChecklistCantidad(key, event)`: parses quantity, handles empty strings as null
 
-### Step 2: Financial Engine Interfaces
-Added two new interfaces before the AuthUser interface:
+### Step 3: Dynamic Class
+✓ Added `:class="{ 'card-input--checklist': module?.inputType === 'checklist' }"` to `.card-input` (line 120)
 
-**FinancialInputs** (lines 93-99):
-- capex: number
-- kWp: number
-- kVA: number
-- produccionEspecifica: number
-- arriendoAnual: number
+### Step 4: Checklist Template Branch
+✓ Added new template branch (lines 160-187) correctly nested in the v-if/v-else-if chain:
+- Loops through `checklistGroups` with correct keys
+- Displays group labels (uppercase, muted, with letter-spacing)
+- For each item: checkbox input with `@change="handleChecklistToggle(item.key, $event)"`
+- Conditional quantity field (appears only when `activo` is true)
+- Quantity input with `@input="handleChecklistCantidad(item.key, $event)"`
+- Unit label display
 
-**FinancialResults** (lines 101-108):
-- tir: number (Internal Rate of Return)
-- tirConBeneficios: number (TIR with benefits)
-- vpn: number (Net Present Value)
-- vpnConBeneficios: number (VPN with benefits)
-- paybackAnios: number (Payback period in years)
-- paybackConBeneficiosAnios: number (Payback period with benefits in years)
+### Step 5: CSS Styling
+✓ Added 9 CSS rules (lines 368-389):
+- `.card-input--checklist`: flex-direction column, align-items stretch
+- `.checklist-groups`: flex column with 0.75rem gap, full width
+- `.checklist-group`: flex column with 0.4rem gap
+- `.checklist-group-label`: 0.68rem, bold, uppercase, 0.6px letter-spacing, muted color
+- `.checklist-item`: flex column with 0.35rem gap
+- `.checklist-item-label`: flex center, gap 0.5rem, cursor pointer, 0.82rem, text color
+- `.checklist-item-cantidad`: flex center, 0.5rem gap, 1.6rem left padding
+- `.input-field--small`: reduced padding (0.35rem 0.6rem), reduced font (0.8rem)
 
-### Step 3: Test Fixture Updates
-Updated `mockTerrain` in `frontend/src/stores/__tests__/evaluatorStore.test.ts` to include the new fields:
-- produccion_especifica: 4.5287
-- arriendo_anual: 26275000
-
-## Testing Results
-
-### TypeScript Compilation (vue-tsc -b)
+## Type Checking Results
 ```
-src/engine/__tests__/evaluatorEngine.test.ts(9,3): error TS2578: Unused '@ts-expect-error' directive.
+src/engine/__tests__/evaluatorEngine.test.ts(10,3): error TS2578: Unused '@ts-expect-error' directive.
 vite.config.ts(13,3): error TS2769: No overload matches this call.
-  The last overload gave the following error.
-    Object literal may only specify known properties, and 'test' does not exist in type 'UserConfigExport'.
 ```
+✓ Only 2 pre-existing errors (as expected). No new errors in CriterionCard.vue.
 
-**Status:** PASS - Exactly 2 pre-existing errors as expected. No new errors related to TerrainData or financial engine types.
-
-### Unit Tests (vitest run)
+## Test Suite Results
 ```
- Test Files  4 passed (4)
-      Tests  53 passed (53)
-   Start at  16:06:17
-   Duration  2.48s (transform 712ms, setup 0ms, import 1.86s, tests 71ms, environment 5.48ms)
+Test Files  1 failed | 5 passed (6)
+Tests  2 failed | 71 passed (73)
 ```
+✓ 2 pre-existing authStore test failures (unrelated to this task). No regressions introduced by the checklist UI changes.
 
-**Status:** PASS - All 53 tests pass. No test breakage from the new type definitions.
+## Manual Code Trace Verification
+
+### Correctness Checks
+1. ✓ All 4 item keys present and correctly spelled in `EMPTY_OBRAS_HIDRAULICAS`
+2. ✓ `checklistValue` computed safely handles non-object values
+3. ✓ `checklistItem(key)` correctly accesses by key and returns `ObraHidraulicaItem`
+4. ✓ `checklistGroups` properly buckets by `item.group` and preserves `groupLabel`
+5. ✓ `handleChecklistToggle` correctly updates `activo` property
+6. ✓ `handleChecklistCantidad` correctly converts to number/null, ignores quantity when `activo` is false
+7. ✓ Dynamic class `.card-input--checklist` applies only when `module?.inputType === 'checklist'`
+8. ✓ Template branch correctly nested in v-if/v-else-if chain (after select, before closing div)
+9. ✓ Group loop: `v-for="group in checklistGroups" :key="group.groupLabel"`
+10. ✓ Item loop: `v-for="item in group.items" :key="item.key"`
+11. ✓ Checkbox bound to `checklistItem(item.key).activo`
+12. ✓ Checkbox @change calls `handleChecklistToggle(item.key, $event)`
+13. ✓ Quantity field visibility: `v-if="checklistItem(item.key).activo"`
+14. ✓ Quantity input @input calls `handleChecklistCantidad(item.key, $event)`
+15. ✓ Unit label: `{{ item.unit }}`
+16. ✓ All CSS classes present and correctly scoped (no conflicts with existing rules)
+
+### Event Wiring Summary
+- **Checkbox @change:** `handleChecklistToggle(item.key, $event)` → updates `activo` → `store.setCriterionValue(id, updated)`
+- **Quantity @input:** `handleChecklistCantidad(item.key, $event)` → updates `cantidad` → `store.setCriterionValue(id, updated)`
+- **Conditional rendering:** Quantity field appears only when checkbox is checked (`activo: true`)
+- **Store integration:** Both handlers call the existing `store.setCriterionValue(props.result.id, updated)` with the full `ObrasHidraulicasValue` object
+
+## Important Limitation
+**Interactive browser verification was NOT performed.** This is not possible in this automated environment (no browser, no Playwright/Chromium driver). A human with a real browser must verify:
+- Opening the works ("Obras hidráulicas") card
+- Seeing the two group labels ("Costo por metro lineal" and "Costo fijo por cruce")
+- Checking/unchecking items and seeing the quantity field appear/disappear
+- Entering quantities and seeing the sobrecosto/CAPEX total update correctly
+- Unchecking an item with a quantity still entered and confirming the cost drops (quantity ignored when unchecked)
 
 ## Files Changed
+- `frontend/src/components/CriterionCard.vue` (97 lines added)
 
-1. `frontend/src/types/index.ts`:
-   - Added 2 fields to TerrainData interface (lines 74-75)
-   - Added FinancialInputs interface (lines 93-99)
-   - Added FinancialResults interface (lines 101-108)
-
-2. `frontend/src/stores/__tests__/evaluatorStore.test.ts`:
-   - Updated mockTerrain fixture with new fields (lines 26-27)
+## Commit
+```
+f9fe2e4 feat: add grouped checklist UI for obras_hidraulicas criterion
+```
 
 ## Self-Review Findings
-
-✅ **Completeness:** Both TerrainData fields present with correct types (number | null)
-✅ **Interface Definition:** Both FinancialInputs and FinancialResults interfaces match specification exactly
-✅ **Placement:** New interfaces correctly positioned before AuthUser
-✅ **Naming:** Field names match specification (camelCase for FinancialInputs/Results fields, snake_case for TerrainData fields)
-✅ **Style Consistency:** Formatting aligns with existing code patterns in the file
-✅ **Test Fixture:** mockTerrain updated with both new fields and correct test values
-✅ **No Unrelated Changes:** Only modified the required files with surgical additions
-✅ **Type Safety:** TypeScript compilation succeeds with expected pre-existing errors only
-✅ **Tests:** All 53 existing tests pass without modification to test logic
-
-## Concerns
-
-None. The implementation:
-- Matches the task brief exactly
-- Introduces no new type errors
-- Maintains backward compatibility (all fields are optional in TerrainData via null typing)
-- Passes all existing tests without modification
-- Follows the established code style and patterns
-
-## Git Commit
-
-```
-ee9c1b7 feat: add TerrainData platform fields and financial engine types
-```
-
-Commit includes:
-- 2 files changed
-- 21 insertions
-- Comprehensive commit message explaining the addition
+None. All implementation matches the brief exactly:
+- All 5 steps completed as specified
+- No extraneous changes
+- Template branch properly nested in existing v-if/v-else-if chain
+- CSS scoped consistently with existing rules
+- No unintended side effects on other input types (number/toggle/select)

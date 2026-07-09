@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { loadCriteria, evaluateCriteria, aggregateCosts } from '../evaluatorEngine'
+import comunidad from '@/criteria/comunidad'
 import type { EvalContext } from '@/types'
 
 const ctx: EvalContext = { baseCapex: 4_000_000_000, kWp: 1320 }
@@ -21,7 +22,7 @@ describe('loadCriteria', () => {
     for (const c of criteria) {
       expect(c.id).toBeTruthy()
       expect(c.label).toBeTruthy()
-      expect(['number', 'toggle', 'select']).toContain(c.inputType)
+      expect(['number', 'toggle', 'select', 'checklist']).toContain(c.inputType)
     }
   })
 })
@@ -34,12 +35,15 @@ describe('evaluateCriteria', () => {
     expect(corteResult?.sobrecosto).toBe(5_700_000)
   })
 
-  it('retorna sobrecosto 0 para criterios con formulaDefined=false', () => {
-    const values = { obras_hidraulicas: 'alta' }
+  it('retorna sobrecosto 0 para criterios con formulaDefined=false, sin invocar computeCost', () => {
+    const computeCostSpy = vi.spyOn(comunidad, 'computeCost')
+    const values = { comunidad: 'conflicto' }
     const results = evaluateCriteria(values, ctx)
-    const result = results.find(r => r.id === 'obras_hidraulicas')
+    const result = results.find(r => r.id === 'comunidad')
     expect(result?.sobrecosto).toBe(0)
     expect(result?.formulaDefined).toBe(false)
+    expect(computeCostSpy).not.toHaveBeenCalled()
+    computeCostSpy.mockRestore()
   })
 
   it('incluye los 18 criterios en el resultado aunque no tengan valor', () => {
