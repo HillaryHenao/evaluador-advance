@@ -188,6 +188,11 @@ describe('obras_hidraulicas', () => {
     expect(obrasHidraulicas.computeCost(value, ctx)).toBe(0)
   })
 
+  it('ignora un ítem activo con cantidad NaN en vez de corromper el total', () => {
+    const value = { ...vacio, canal_concreto: { activo: true, cantidad: NaN } }
+    expect(obrasHidraulicas.computeCost(value, ctx)).toBe(0)
+  })
+
   it('retorna 0 para valor nulo', () => {
     expect(obrasHidraulicas.computeCost(null, ctx)).toBe(0)
   })

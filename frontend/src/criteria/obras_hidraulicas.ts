@@ -20,7 +20,7 @@ const obrasHidraulicas: CriterionModule = {
     const v = value as ObrasHidraulicasValue
     return ITEMS.reduce((total, item) => {
       const entry = v[item.key as keyof ObrasHidraulicasValue]
-      if (!entry?.activo || typeof entry.cantidad !== 'number') return total
+      if (!entry?.activo || typeof entry.cantidad !== 'number' || !Number.isFinite(entry.cantidad)) return total
       return total + entry.cantidad * item.tarifa
     }, 0)
   },
