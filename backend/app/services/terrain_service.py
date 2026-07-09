@@ -83,6 +83,42 @@ def _get_coexistencias(project_id: int) -> tuple[bool, list[dict]]:
         return False, []
 
 
+def _get_numero_arboles(terrain_id: int) -> Optional[int]:
+    """Suma el número de árboles de TODOS los proyectos del terreno. El campo se registra
+    por proyecto (validation_field.project_id), no por terreno, y un terreno puede tener
+    varios proyectos (ver _get_aprovechamiento_forestal) — sumar solo el del proyecto que
+    la consulta principal elige arbitrariamente subestima el total real del terreno.
+    Retorna None si ningún proyecto tiene el dato registrado."""
+    try:
+        conn = _connect(os.environ['DATABASE_URL'])
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """SELECT vf.value
+                       FROM validation_field vf
+                       JOIN minifarm_project p ON p.id = vf.project_id
+                       WHERE p.terrain_id = %s
+                         AND vf.name = 'Número de árboles'
+                         AND vf.value IS NOT NULL"""
+                    ,
+                    (terrain_id,),
+                )
+                rows = cur.fetchall()
+        finally:
+            conn.close()
+    except Exception:
+        return None
+
+    total = 0
+    encontrado = False
+    for r in rows:
+        raw = (r['value'] or '').strip()
+        if raw.isdigit():
+            total += int(raw)
+            encontrado = True
+    return total if encontrado else None
+
+
 # Estados del valor de 'Licencia de aprovechamiento forestal' que se consideran resueltos
 _APROV_RESUELTO = {'exonerado', 'solicitud aprobada'}
 
@@ -218,15 +254,6 @@ def get_terrain_data(code: str) -> Optional[dict]:
                         ORDER BY e.id DESC LIMIT 1
                     )                                           AS servidumbre_easement_public_status,
 
-                    -- Número de árboles
-                    (
-                        SELECT vf.value FROM validation_field vf
-                        WHERE (vf.project_id = p.id OR vf.terrain_id = t.id)
-                          AND vf.name = 'Número de árboles'
-                          AND vf.value IS NOT NULL
-                        ORDER BY vf.id DESC LIMIT 1
-                    )                                           AS numero_arboles_raw,
-
                     -- Arriendo anual desde termsheet
                     (
                         SELECT ts.rent_annual_cost_cop
@@ -353,8 +380,7 @@ def get_terrain_data(code: str) -> Optional[dict]:
     # Sin registro o todas resueltas/aprobadas → False; alguna en otro estado → True
     d['coexistencias'], d['coexistencias_detalle'] = _get_coexistencias(project_id)
 
-    # numero_arboles: valor numérico del campo de validación
-    arboles_raw = d.pop('numero_arboles_raw', None)
-    d['numero_arboles'] = int(arboles_raw) if arboles_raw and arboles_raw.strip().isdigit() else None
+    # numero_arboles: suma de todos los proyectos del terreno (ver _get_numero_arboles)
+    d['numero_arboles'] = _get_numero_arboles(terrain_id)
 
     return d
