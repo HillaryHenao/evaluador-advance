@@ -1,21 +1,15 @@
 # SDD Progress Ledger
 
-Project: evaluador-advance — motor-financiero
-Plan: docs/superpowers/plans/2026-07-03-motor-financiero.md
-Branch: feature/motor-financiero
-Started: 2026-07-03
-Baseline commit: 814e3ff
+Project: evaluador-advance — obras-hidraulicas
+Plan: docs/superpowers/plans/2026-07-09-obras-hidraulicas.md
+Branch: feature/obras-hidraulicas
+Started: 2026-07-09
+Baseline commit: 664de21
 
-Task 1: complete (commits 814e3ff..9a50a7c, review clean, 3/4 tests — 1 pre-existing unrelated auth failure)
-Task 2: complete (commits 9a50a7c..ee9c1b7, review clean, 53/53 tests)
-Task 3: complete (commits ee9c1b7..8d9a7cb, review clean, 3/3 new tests, 56/56 total)
-Task 4: complete (commits 8d9a7cb..0275683, review clean, 3/3 focused + 59/59 total)
-Task 5: complete (commits 0275683..775d2ad, review clean, 7/7 new + 63/63 total; payback approximate ~0.5-0.7yr off from Excel, documented/accepted per plan)
-Task 6: complete (commits 775d2ad..7e2822a, review clean, 5/5 store + 65/65 total; noted store field is arriendoManual not arriendoAnual per plan's own code block)
-Task 7: complete (commits 7e2822a..eed24ee, review clean, vue-tsc clean — 2 preexisting unrelated errors only; Minor: formatCOP negative-sign display, empty-state styling — cosmetic, inherited from plan's own code)
-Task 8: complete (commits eed24ee..72fc478, review clean, 65/65 tests, backend/frontend smoke-tested)
+Task 1: complete (commits 664de21..baac9ef, review clean after 2 fix rounds — scope note: touched evaluatorEngine.test.ts outside declared 3-file scope, justified/necessary; 71/73 tests reported by subagents — see correction below)
+Task 2: complete (commits baac9ef..f9fe2e4, review clean, vue-tsc clean — 2 preexisting unrelated errors only; no automated component tests exist in this repo (established convention) and no browser-automation tool is available in this environment, so interactive click-through was NOT performed by implementer or reviewer — needs human verification in a real browser before merge; Minor: EMPTY_OBRAS_HIDRAULICAS hardcodes 4 keys instead of deriving from checklistItems, NaN not filtered by Number(raw) parsing (pre-existing risk pattern, not a regression))
 
-All 8 tasks complete. Proceeding to final whole-branch review.
+Correction: the "2 pre-existing unrelated auth failures" reported by every subagent this session were NOT pre-existing — verified they're caused by the controller's own local-only frontend/.env.local (VITE_SKIP_AUTH=true dev bypass, gitignored via *.local, never committed). With that file set aside, authStore.test.ts is 3/3 green. True suite state: 74/74 passing.
 
-Final whole-branch review: PASSED WITH FIXES (commit a08e5d1 — payback test coverage added, 4 minor polish items addressed: payback approximation documented in code, constants consolidated, formatCOP negative-sign fixed, financialData.ts indexing note added)
-Branch: feature/motor-financiero — READY TO MERGE
+Final whole-branch review: PASSED WITH OPTIONAL FIX (commit bf2db19 — added Number.isFinite guard in obras_hidraulicas.ts computeCost per reviewer's Minor recommendation, since this is a new real-money CAPEX input; plus 1 new test for the NaN case). No Critical/Important findings. Sole precondition for merge: human interactive browser verification (no browser-automation tool available in this environment) — see manual test steps in docs/superpowers/plans/2026-07-09-obras-hidraulicas.md Task 2 Step 6.
+Branch: feature/obras-hidraulicas — READY TO MERGE pending manual browser verification
