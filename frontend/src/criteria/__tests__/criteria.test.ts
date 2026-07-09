@@ -196,4 +196,13 @@ describe('obras_hidraulicas', () => {
     expect(obrasHidraulicas.formulaDefined).toBe(true)
     expect(obrasHidraulicas.category).toBe('fijo')
   })
+
+  it('define checklistItems en el orden canal, cuneta, box culvert, alcantarilla', () => {
+    expect(obrasHidraulicas.checklistItems?.map(item => item.key)).toEqual([
+      'canal_concreto',
+      'cuneta_via',
+      'box_culvert',
+      'alcantarilla_cruce',
+    ])
+  })
 })
