@@ -13,70 +13,120 @@ El usuario definió 4 tipos concretos de obra hidráulica con costos reales (man
 | Obra de cruce — Box culvert (3m x 3m) | por cruce (valor específico, no lineal) | $170.000.000 |
 | Obra de cruce — Alcantarilla (Ø0.9m) | por cruce (valor específico, no lineal) | $50.000.000 |
 
-Objetivo: reemplazar el placeholder por un cálculo real. Un mismo terreno puede requerir varios tipos de obra combinados a la vez (ej. 40m de canal + 1 box culvert), así que cada tipo debe sumar independientemente al sobrecosto total.
+Objetivo: reemplazar el placeholder por un cálculo real. Un mismo terreno puede requerir varios tipos de obra combinados a la vez (ej. 40m de canal + 1 box culvert), así que el usuario necesita marcar cuáles tipos aplican e ingresar su cantidad para cada uno.
 
 ## Decisiones (validadas con el usuario)
 
-- **Los 4 tipos se combinan**, no son mutuamente excluyentes — cada uno es un criterio independiente cuyo sobrecosto se suma al CAPEX total (el motor ya suma todos los criterios `category: 'fijo'`/`'ambas'` vía `aggregateCosts`, sin cambios necesarios ahí).
-- **4 tarjetas separadas en la UI**, no una tarjeta compuesta. Esto encaja con la arquitectura existente de "un criterio = un valor escalar + un `computeCost`" sin tocar `CriterionValue`, `evaluatorEngine.ts` ni `CriterionCard.vue`. Sigue el mismo patrón que `corte.ts` (número manual × tarifa fija).
-- **Todos son de ingreso manual** (`dataSource: 'manual'`) — no hay dato equivalente en la BD de originabot para ninguno de los 4 tipos, igual que `corte` o `pilotes`.
-- **Categoría `fijo`** para los 4 — son costos de obra civil conocidos, no factores de riesgo probabilístico (a diferencia de la sección "Factores de riesgo").
+- **Los 4 tipos se combinan** — no son mutuamente excluyentes. El criterio permite marcar varios a la vez y su costo se suma.
+- **Ingreso manual siempre** (`dataSource: 'manual'`) — no hay dato equivalente en la BD de originabot para ninguno de los 4 tipos.
+- **UI: un checklist agrupado dentro de una sola tarjeta** "Obras hidráulicas" (no 4 tarjetas separadas ni un select cualitativo). Se agrupan visualmente en dos secciones:
+  - **Costo por metro lineal**: Canal en concreto, Cuneta típica de vía — al marcar el checkbox se habilita un campo de metros.
+  - **Costo fijo por cruce**: Box culvert, Alcantarilla — al marcar el checkbox se habilita un campo de cantidad de cruces (un terreno puede tener más de un cruce del mismo tipo, ej. 2 alcantarillas = 2 × $50.000.000).
+- Si un ítem no está marcado, su cantidad (si tiene alguna cargada) se ignora en el cálculo.
+- **Categoría `fijo`** para el criterio completo — es un costo de obra civil conocido, no un factor de riesgo probabilístico.
 
-## Módulos nuevos
+## Modelo de datos
 
-Se elimina `frontend/src/criteria/obras_hidraulicas.ts` y se agregan 4 archivos nuevos en `frontend/src/criteria/`, cada uno con la forma exacta de `CriterionModule` (ver `frontend/src/types/index.ts`):
+Este criterio es una excepción puntual al patrón general "un criterio = un valor escalar" que usan los demás 21 criterios — la misma clase de excepción que ya existe en `CriterionCard.vue` para mostrar detalle de `coexistencias`/`servidumbre`/`aprovechamiento_forestal` (ahí es solo display; acá es también input). Se justifica porque el usuario necesita marcar varios ítems independientes con cantidad propia dentro de un mismo criterio, algo que no cubre ninguno de los `inputType` existentes (`number`, `toggle`, `select`).
 
-| Archivo | id | label | inputType | unit | dataSource | category | tarifa |
-|---|---|---|---|---|---|---|---|
-| `canal_concreto.ts` | `canal_concreto` | Canal en concreto (2m x 0.5m) | `number` | `m` | `manual` | `fijo` | 1.300.000 COP/m |
-| `cuneta_via.ts` | `cuneta_via` | Cuneta típica de vía | `number` | `m` | `manual` | `fijo` | 300.000 COP/m |
-| `box_culvert.ts` | `box_culvert` | Obra de cruce — Box culvert 3m x 3m | `number` | `cruces` | `manual` | `fijo` | 170.000.000 COP/cruce |
-| `alcantarilla_cruce.ts` | `alcantarilla_cruce` | Obra de cruce — Alcantarilla Ø0.9m | `number` | `cruces` | `manual` | `fijo` | 50.000.000 COP/cruce |
-
-Cada `computeCost` sigue el patrón de `corte.ts`:
+**`frontend/src/types/index.ts`** — nuevos tipos y ampliación de `CriterionValue`:
 
 ```ts
-computeCost(value: CriterionValue, _context: EvalContext): number {
-  if (value === null || typeof value !== 'number') return 0
-  return value * TARIFA
+export interface ObraHidraulicaItem {
+  activo: boolean
+  cantidad: number | null
+}
+
+export interface ObrasHidraulicasValue {
+  canal_concreto: ObraHidraulicaItem
+  cuneta_via: ObraHidraulicaItem
+  box_culvert: ObraHidraulicaItem
+  alcantarilla_cruce: ObraHidraulicaItem
+}
+
+export type CriterionValue = number | boolean | string | null | ObrasHidraulicasValue
+```
+
+`CriterionModule.inputType` gana un nuevo valor: `'checklist'` (además de `'number' | 'toggle' | 'select'`).
+
+`CriterionModule` gana un campo opcional, usado únicamente por criterios con `inputType: 'checklist'`:
+
+```ts
+export interface ChecklistItemDef {
+  key: string          // debe existir como propiedad en ObrasHidraulicasValue
+  label: string
+  unit: string
+  group: 'metro' | 'fijo'
+  groupLabel: string   // 'Costo por metro lineal' | 'Costo fijo por cruce'
+  tarifa: number
+}
+
+export interface CriterionModule {
+  // ...campos existentes sin cambios...
+  checklistItems?: ChecklistItemDef[]
 }
 ```
 
-`formulaDefined: true` en los 4 (deja de mostrarse el badge "Pendiente" que tenía el placeholder).
+## Módulo `frontend/src/criteria/obras_hidraulicas.ts` (se reescribe completo)
+
+```ts
+const ITEMS: ChecklistItemDef[] = [
+  { key: 'canal_concreto', label: 'Canal en concreto (2m x 0.5m)', unit: 'm', group: 'metro', groupLabel: 'Costo por metro lineal', tarifa: 1_300_000 },
+  { key: 'cuneta_via', label: 'Cuneta típica de vía', unit: 'm', group: 'metro', groupLabel: 'Costo por metro lineal', tarifa: 300_000 },
+  { key: 'box_culvert', label: 'Box culvert (3m x 3m)', unit: 'cruces', group: 'fijo', groupLabel: 'Costo fijo por cruce', tarifa: 170_000_000 },
+  { key: 'alcantarilla_cruce', label: 'Alcantarilla (Ø0.9m)', unit: 'cruces', group: 'fijo', groupLabel: 'Costo fijo por cruce', tarifa: 50_000_000 },
+]
+
+const obrasHidraulicas: CriterionModule = {
+  id: 'obras_hidraulicas',
+  label: 'Obras hidráulicas',
+  inputType: 'checklist',
+  dataSource: 'manual',
+  formulaDefined: true,
+  category: 'fijo',
+  checklistItems: ITEMS,
+  computeCost(value: CriterionValue, _context: EvalContext): number {
+    if (!value || typeof value !== 'object') return 0
+    const v = value as ObrasHidraulicasValue
+    return ITEMS.reduce((total, item) => {
+      const entry = v[item.key as keyof ObrasHidraulicasValue]
+      if (!entry?.activo || typeof entry.cantidad !== 'number') return total
+      return total + entry.cantidad * item.tarifa
+    }, 0)
+  },
+}
+
+export default obrasHidraulicas
+```
+
+## UI — `frontend/src/components/CriterionCard.vue`
+
+Nueva rama de template para `module?.inputType === 'checklist'`, agrupando `module.checklistItems` por `group` (dos secciones: "Costo por metro lineal" y "Costo fijo por cruce"). Por cada ítem:
+
+- Checkbox — estado `value?.[item.key]?.activo` (con `value` por defecto objeto vacío si `result.value === null`).
+- Si está marcado: campo numérico para `cantidad`, con `item.unit` como sufijo.
+- Al cambiar cualquiera de los dos, se reconstruye el objeto `ObrasHidraulicasValue` completo (clonando el valor actual y actualizando solo el ítem tocado) y se llama `store.setCriterionValue('obras_hidraulicas', updated)`.
+
+El resto de la tarjeta (badges, sección de sobrecosto total vía `result.sobrecosto`) no cambia — ya es genérico y funciona igual para cualquier criterio con `category !== 'probabilidad'`.
 
 ## Integración
 
-- **`frontend/src/views/EvaluadorView.vue`**: en `FIJO_ORDER`, reemplazar la entrada `'obras_hidraulicas'` por las 4 entradas nuevas, agrupadas en el mismo lugar de la lista:
-  ```ts
-  const FIJO_ORDER = [
-    'distancia_red', 'distancia_via',
-    'corte', 'lleno',
-    'nivel_tension', 'cluster',
-    'canal_concreto', 'cuneta_via', 'box_culvert', 'alcantarilla_cruce',
-    'aprovechamiento_forestal',
-  ]
-  ```
-- El sistema de carga de criterios (`loadCriteria()` en `evaluatorEngine.ts`) usa `import.meta.glob('../criteria/*.ts', { eager: true })`, así que los 4 archivos nuevos se descubren automáticamente sin registro manual adicional.
-- No hay cambios en `types/index.ts`, `evaluatorEngine.ts` ni `CriterionCard.vue` — la UI genérica de `inputType: 'number'` ya renderiza correctamente estos 4 criterios.
+- `frontend/src/views/EvaluadorView.vue`: sin cambios — `'obras_hidraulicas'` ya está en `FIJO_ORDER`.
+- `frontend/src/stores/evaluatorStore.ts`: sin cambios — `setCriterionValue(id, value)` ya es genérico sobre `CriterionValue`.
+- `frontend/src/engine/evaluatorEngine.ts`: sin cambios — `aggregateCosts` ya suma cualquier criterio `category: 'fijo'` sin importar la forma de su `value`.
 
 ## Testing
 
-En `frontend/src/criteria/__tests__/criteria.test.ts`, agregar un `describe` por criterio nuevo siguiendo el patrón de `corte`/`numero_arboles`:
+`frontend/src/criteria/__tests__/criteria.test.ts` — nuevo `describe('obras_hidraulicas')`:
 
-```ts
-describe('canal_concreto', () => {
-  it('calcula 1.300.000 COP por metro', () => {
-    expect(canalConcreto.computeCost(40, ctx)).toBe(52_000_000)
-  })
-  it('retorna 0 para valor nulo', () => {
-    expect(canalConcreto.computeCost(null, ctx)).toBe(0)
-  })
-})
-// ... análogo para cuneta_via (300.000/m), box_culvert (170.000.000/cruce), alcantarilla_cruce (50.000.000/cruce)
-```
+- Objeto con `canal_concreto: { activo: true, cantidad: 40 }` y el resto `{ activo: false, cantidad: null }` → `52_000_000`.
+- Combinación de dos ítems activos (ej. canal + box_culvert) → suma de ambos.
+- Ítem con `cantidad` cargada pero `activo: false` → se ignora (no suma).
+- `value === null` → retorna 0.
+- `formulaDefined` es `true` y `category` es `fijo`.
 
 ## Fuera de alcance
 
-- No se modelan tamaños/variantes adicionales de obra (ej. box culvert de otras dimensiones, canal de otras medidas) — si aparecen en el futuro, se agregan como criterios adicionales siguiendo el mismo patrón.
-- No se toca el motor financiero (`financialEngine.ts`) — estos criterios ya alimentan el CAPEX vía `aggregated.capexTotal`, que el motor financiero ya consume.
-- No se elimina el badge "Pendiente" de otros criterios — solo afecta a los 4 nuevos, que nacen con `formulaDefined: true`.
+- No se modelan tamaños/variantes adicionales de obra (ej. box culvert de otras dimensiones) — si aparecen en el futuro, se agregan como ítems adicionales al array `ITEMS`.
+- No se toca el motor financiero (`financialEngine.ts`) — este criterio ya alimenta el CAPEX vía `aggregated.capexTotal`, que el motor financiero ya consume.
+- No se persiste el checklist en la BD — es siempre manual y se resetea al buscar un nuevo terreno, igual que los demás criterios manuales.
