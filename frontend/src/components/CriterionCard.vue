@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useEvaluatorStore } from '@/stores/evaluatorStore'
 import { loadCriteria, COSTO_POR_MES } from '@/engine/evaluatorEngine'
-import type { CriterionResult } from '@/types'
+import type { CriterionResult, ObrasHidraulicasValue, ObraHidraulicaItem } from '@/types'
 
 const props = defineProps<{ result: CriterionResult }>()
 const store = useEvaluatorStore()
@@ -14,6 +14,49 @@ const accentColor = computed(() => {
   if (props.result.value !== null) return 'var(--purple)'
   return 'var(--border)'
 })
+
+const EMPTY_OBRAS_HIDRAULICAS: ObrasHidraulicasValue = {
+  canal_concreto: { activo: false, cantidad: null },
+  cuneta_via: { activo: false, cantidad: null },
+  box_culvert: { activo: false, cantidad: null },
+  alcantarilla_cruce: { activo: false, cantidad: null },
+}
+
+const checklistValue = computed<ObrasHidraulicasValue>(() => {
+  const v = props.result.value
+  return (v && typeof v === 'object') ? v as ObrasHidraulicasValue : EMPTY_OBRAS_HIDRAULICAS
+})
+
+function checklistItem(key: string): ObraHidraulicaItem {
+  return checklistValue.value[key as keyof ObrasHidraulicasValue]
+}
+
+const checklistGroups = computed(() => {
+  const items = module.value?.checklistItems ?? []
+  const order: string[] = []
+  const groups = new Map<string, { groupLabel: string; items: typeof items }>()
+  for (const item of items) {
+    if (!groups.has(item.group)) {
+      groups.set(item.group, { groupLabel: item.groupLabel, items: [] })
+      order.push(item.group)
+    }
+    groups.get(item.group)!.items.push(item)
+  }
+  return order.map(key => groups.get(key)!)
+})
+
+function handleChecklistToggle(key: string, event: Event) {
+  const target = event.target as HTMLInputElement
+  const updated = { ...checklistValue.value, [key]: { ...checklistItem(key), activo: target.checked } } as ObrasHidraulicasValue
+  store.setCriterionValue(props.result.id, updated)
+}
+
+function handleChecklistCantidad(key: string, event: Event) {
+  const target = event.target as HTMLInputElement
+  const raw = target.value
+  const updated = { ...checklistValue.value, [key]: { ...checklistItem(key), cantidad: raw === '' ? null : Number(raw) } } as ObrasHidraulicasValue
+  store.setCriterionValue(props.result.id, updated)
+}
 
 function formatCOP(value: number): string {
   if (value === 0) return '—'
@@ -74,7 +117,7 @@ function handleToggle(event: Event) {
       </div>
     </div>
 
-    <div class="card-input">
+    <div class="card-input" :class="{ 'card-input--checklist': module?.inputType === 'checklist' }">
       <template v-if="module?.inputType === 'number'">
         <input
           type="number"
@@ -112,6 +155,35 @@ function handleToggle(event: Event) {
             {{ opt.label }}
           </option>
         </select>
+      </template>
+
+      <template v-else-if="module?.inputType === 'checklist'">
+        <div class="checklist-groups">
+          <div v-for="group in checklistGroups" :key="group.groupLabel" class="checklist-group">
+            <span class="checklist-group-label">{{ group.groupLabel }}</span>
+            <div v-for="item in group.items" :key="item.key" class="checklist-item">
+              <label class="checklist-item-label">
+                <input
+                  type="checkbox"
+                  :checked="checklistItem(item.key).activo"
+                  class="toggle-checkbox"
+                  @change="handleChecklistToggle(item.key, $event)"
+                />
+                <span>{{ item.label }}</span>
+              </label>
+              <div v-if="checklistItem(item.key).activo" class="checklist-item-cantidad">
+                <input
+                  type="number"
+                  :value="checklistItem(item.key).cantidad ?? ''"
+                  :placeholder="`0 ${item.unit}`"
+                  class="input-field input-field--small"
+                  @input="handleChecklistCantidad(item.key, $event)"
+                />
+                <span class="input-unit">{{ item.unit }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </template>
     </div>
 
@@ -292,6 +364,29 @@ function handleToggle(event: Event) {
 }
 
 .input-unit { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+
+.card-input--checklist { flex-direction: column; align-items: stretch; }
+
+.checklist-groups { display: flex; flex-direction: column; gap: 0.75rem; width: 100%; }
+.checklist-group { display: flex; flex-direction: column; gap: 0.4rem; }
+.checklist-group-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+}
+.checklist-item { display: flex; flex-direction: column; gap: 0.35rem; }
+.checklist-item-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--text);
+}
+.checklist-item-cantidad { display: flex; align-items: center; gap: 0.5rem; padding-left: 1.6rem; }
+.input-field--small { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
 
 .toggle-label {
   display: flex;
