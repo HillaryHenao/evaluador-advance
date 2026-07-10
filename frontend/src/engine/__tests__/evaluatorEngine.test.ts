@@ -32,7 +32,7 @@ describe('evaluateCriteria', () => {
     const values = { corte: 100 }
     const results = evaluateCriteria(values, ctx)
     const corteResult = results.find(r => r.id === 'corte')
-    expect(corteResult?.sobrecosto).toBe(5_700_000)
+    expect(corteResult?.sobrecosto).toBe(8_000_000)
   })
 
   it('retorna sobrecosto 0 para criterios con formulaDefined=false, sin invocar computeCost', () => {
@@ -57,7 +57,7 @@ describe('aggregateCosts', () => {
     const values = { corte: 100, lleno: 10, pilotes: true }
     const results = evaluateCriteria(values, ctx)
     const aggregated = aggregateCosts(results, ctx)
-    const expected = 100 * 57_000 + 10 * 190_000 + 156_000_000
+    const expected = 100 * 80_000 + 10 * 210_000 + 156_000_000
     expect(aggregated.totalSobrecostoFijo).toBe(expected)
   })
 
@@ -65,7 +65,7 @@ describe('aggregateCosts', () => {
     const values = { corte: 100 }
     const results = evaluateCriteria(values, ctx)
     const aggregated = aggregateCosts(results, ctx)
-    expect(aggregated.capexTotal).toBe(ctx.baseCapex + 100 * 57_000)
+    expect(aggregated.capexTotal).toBe(ctx.baseCapex + 100 * 80_000)
   })
 
   it('pilotes suma 156M al CAPEX como costo fijo, no al factor de riesgo', () => {

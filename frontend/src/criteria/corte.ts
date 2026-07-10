@@ -10,7 +10,7 @@ const corte: CriterionModule = {
   category: 'fijo',
   computeCost(value: CriterionValue, _context: EvalContext): number {
     if (value === null || typeof value !== 'number') return 0
-    return value * 57_000
+    return value * 80_000
   },
 }
 

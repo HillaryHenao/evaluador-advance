@@ -15,8 +15,8 @@ import obrasHidraulicas from '../obras_hidraulicas'
 const ctx = { baseCapex: 4_000_000_000, kWp: 1320 }
 
 describe('corte', () => {
-  it('calcula 57.000 COP por m³', () => {
-    expect(corte.computeCost(100, ctx)).toBe(5_700_000)
+  it('calcula 80.000 COP por m³', () => {
+    expect(corte.computeCost(100, ctx)).toBe(8_000_000)
   })
   it('retorna 0 para valor nulo', () => {
     expect(corte.computeCost(null, ctx)).toBe(0)
@@ -27,8 +27,8 @@ describe('corte', () => {
 })
 
 describe('lleno', () => {
-  it('calcula 190.000 COP por m³', () => {
-    expect(lleno.computeCost(10, ctx)).toBe(1_900_000)
+  it('calcula 210.000 COP por m³', () => {
+    expect(lleno.computeCost(10, ctx)).toBe(2_100_000)
   })
   it('retorna 0 para valor nulo', () => {
     expect(lleno.computeCost(null, ctx)).toBe(0)
