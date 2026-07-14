@@ -3,7 +3,6 @@ import { computed } from 'vue'
 import AppHeader from '@/components/AppHeader.vue'
 import TerrainSearch from '@/components/TerrainSearch.vue'
 import CriterionCard from '@/components/CriterionCard.vue'
-import SummaryPanel from '@/components/SummaryPanel.vue'
 import FinancialResultsPanel from '@/components/FinancialResultsPanel.vue'
 import ProjectBreakdownPanel from '@/components/ProjectBreakdownPanel.vue'
 import { useEvaluatorStore } from '@/stores/evaluatorStore'
@@ -66,7 +65,6 @@ const probabilidadResults = computed(() =>
           </section>
         </div>
       </main>
-      <SummaryPanel />
       <FinancialResultsPanel />
     </div>
   </div>

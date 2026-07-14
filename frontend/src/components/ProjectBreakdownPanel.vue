@@ -24,12 +24,13 @@ function formatAnios(value: number): string {
 }
 
 const proyectos = computed(() => {
+  const n = Math.max(store.proyectoNombres.length, 1)
   return store.proyectoNombres.map(nombre => {
     const results = store.perProjectResults[nombre] ?? []
     const aggregated = aggregateCosts(results, {
       baseCapex: store.baseCapex,
       kWp: store.kWp,
-      projectCount: Math.max(store.proyectoNombres.length, 1),
+      projectCount: n,
     })
     const fijoItems = aggregated.breakdown.filter(
       r => (r.category === 'fijo' || r.category === 'ambas') && r.formulaDefined && r.sobrecosto !== 0,
@@ -40,11 +41,14 @@ const proyectos = computed(() => {
     const riesgoItems = aggregated.breakdown.filter(
       r => r.category === 'probabilidad' && r.formulaDefined && r.sobrecosto > 0,
     )
+    const capexBase = store.baseCapex / n
     return {
       nombre,
       fijoItems,
       riesgoItems,
       costosFijos: aggregated.totalSobrecostoFijo,
+      capexBase,
+      capexTotal: capexBase + aggregated.totalSobrecostoFijo,
       riesgoMonto: aggregated.totalRetraso + aggregated.totalRiesgoCosto,
       vpn: store.perProjectFinancials?.[nombre]?.vpn ?? null,
       vpnConBeneficios: store.perProjectFinancials?.[nombre]?.vpnConBeneficios ?? null,
@@ -56,6 +60,24 @@ const proyectos = computed(() => {
 <template>
   <section v-if="proyectos.length > 0" class="breakdown-section">
     <div class="section-title">Desglose por proyecto</div>
+
+    <div class="breakdown-terreno-totals">
+      <div class="breakdown-terreno-item">
+        <span class="breakdown-terreno-label">CAPEX Total del terreno</span>
+        <span class="breakdown-terreno-value">{{ formatCOP(store.aggregated.capexTotal) }}</span>
+      </div>
+      <div v-if="store.aggregated.totalRetraso > 0 || store.aggregated.totalRiesgoCosto > 0" class="breakdown-terreno-item">
+        <span class="breakdown-terreno-label">
+          Riesgo de retraso<template v-if="store.aggregated.totalRetraso > 0"> ({{ store.aggregated.totalRetrasoMeses }} meses)</template>
+        </span>
+        <span class="breakdown-terreno-value breakdown-terreno-value--riesgo">
+          {{ formatCOP(store.aggregated.totalRetraso + store.aggregated.totalRiesgoCosto) }}
+        </span>
+      </div>
+    </div>
+    <div v-if="store.aggregated.totalRetraso > 0 || store.aggregated.totalRiesgoCosto > 0" class="breakdown-note-text">
+      Riesgo no incluido en el CAPEX
+    </div>
 
     <div v-if="store.financialResults" class="breakdown-financials-note">
       <span>TIR: {{ formatPct(store.financialResults.tir) }}</span>
@@ -77,6 +99,15 @@ const proyectos = computed(() => {
         <div class="breakdown-row breakdown-row--subtotal">
           <span class="breakdown-label">Fijos</span>
           <span class="breakdown-value">{{ formatCOP(p.costosFijos) }}</span>
+        </div>
+
+        <div class="breakdown-row">
+          <span class="breakdown-label">CAPEX base</span>
+          <span class="breakdown-value">{{ formatCOP(p.capexBase) }}</span>
+        </div>
+        <div class="breakdown-row breakdown-row--total">
+          <span class="breakdown-label">CAPEX total</span>
+          <span class="breakdown-value">{{ formatCOP(p.capexTotal) }}</span>
         </div>
 
         <template v-if="p.riesgoItems.length > 0">
@@ -191,4 +222,15 @@ const proyectos = computed(() => {
 }
 
 .breakdown-divider { height: 1px; background: var(--border); margin: 0.3rem 0; }
+
+.breakdown-terreno-totals {
+  display: flex;
+  gap: 1.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.3rem;
+}
+.breakdown-terreno-item { display: flex; flex-direction: column; gap: 0.1rem; }
+.breakdown-terreno-label { font-size: 0.7rem; color: var(--muted); font-weight: 600; }
+.breakdown-terreno-value { font-size: 1rem; font-weight: 800; color: var(--purple); }
+.breakdown-terreno-value--riesgo { color: var(--warn); }
 </style>
