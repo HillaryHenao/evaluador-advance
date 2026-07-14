@@ -41,6 +41,8 @@ const probabilidadResults = computed(() =>
         <TerrainSearch />
 
         <div class="criteria-content">
+          <ProjectBreakdownPanel />
+
           <section class="criteria-section">
             <div class="section-title">Costos fijos del terreno</div>
             <div class="criteria-grid">
@@ -62,8 +64,6 @@ const probabilidadResults = computed(() =>
               />
             </div>
           </section>
-
-          <ProjectBreakdownPanel />
         </div>
       </main>
       <SummaryPanel />

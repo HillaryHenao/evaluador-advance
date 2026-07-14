@@ -31,12 +31,20 @@ const proyectos = computed(() => {
       kWp: store.kWp,
       projectCount: Math.max(store.proyectoNombres.length, 1),
     })
+    const fijoItems = aggregated.breakdown.filter(
+      r => (r.category === 'fijo' || r.category === 'ambas') && r.formulaDefined && r.sobrecosto !== 0,
+    )
+    // Solo el monto en pesos, sin traducir a meses — servidumbre/amenazas (riskType
+    // 'meses') divididos entre proyectos pueden dar meses fraccionarios (spec: mostrar
+    // solo el monto en el desglose por proyecto).
+    const riesgoItems = aggregated.breakdown.filter(
+      r => r.category === 'probabilidad' && r.formulaDefined && r.sobrecosto > 0,
+    )
     return {
       nombre,
+      fijoItems,
+      riesgoItems,
       costosFijos: aggregated.totalSobrecostoFijo,
-      // Solo el monto en pesos, sin traducir a meses — servidumbre/amenazas (riskType
-      // 'meses') divididos entre proyectos pueden dar meses fraccionarios (spec: mostrar
-      // solo el monto en el desglose por proyecto).
       riesgoMonto: aggregated.totalRetraso + aggregated.totalRiesgoCosto,
       vpn: store.perProjectFinancials?.[nombre]?.vpn ?? null,
       vpnConBeneficios: store.perProjectFinancials?.[nombre]?.vpnConBeneficios ?? null,
@@ -58,15 +66,32 @@ const proyectos = computed(() => {
     <div class="breakdown-grid">
       <div v-for="p in proyectos" :key="p.nombre" class="breakdown-card">
         <div class="breakdown-card-title">{{ p.nombre }}</div>
-        <div class="breakdown-row">
-          <span class="breakdown-label">Costos fijos</span>
+
+        <div v-if="p.fijoItems.length === 0" class="breakdown-empty">
+          Sin sobrecostos fijos calculados.
+        </div>
+        <div v-for="item in p.fijoItems" :key="item.id" class="breakdown-item-row">
+          <span class="breakdown-item-label">{{ item.label }}</span>
+          <span class="breakdown-item-value">{{ formatCOP(item.sobrecosto) }}</span>
+        </div>
+        <div class="breakdown-row breakdown-row--subtotal">
+          <span class="breakdown-label">Fijos</span>
           <span class="breakdown-value">{{ formatCOP(p.costosFijos) }}</span>
         </div>
-        <div class="breakdown-row">
-          <span class="breakdown-label">Riesgo</span>
-          <span class="breakdown-value">{{ formatCOP(p.riesgoMonto) }}</span>
-        </div>
-        <div v-if="p.vpn !== null" class="breakdown-row">
+
+        <template v-if="p.riesgoItems.length > 0">
+          <div class="breakdown-divider" />
+          <div v-for="item in p.riesgoItems" :key="item.id" class="breakdown-item-row">
+            <span class="breakdown-item-label">{{ item.label }}</span>
+            <span class="breakdown-item-value breakdown-item-value--riesgo">{{ formatCOP(item.sobrecosto) }}</span>
+          </div>
+          <div class="breakdown-row breakdown-row--subtotal">
+            <span class="breakdown-label">Riesgo</span>
+            <span class="breakdown-value">{{ formatCOP(p.riesgoMonto) }}</span>
+          </div>
+        </template>
+
+        <div v-if="p.vpn !== null" class="breakdown-row breakdown-row--total">
           <span class="breakdown-label">VPN</span>
           <span class="breakdown-value">{{ formatCOP(p.vpn) }}</span>
         </div>
@@ -135,4 +160,35 @@ const proyectos = computed(() => {
 .breakdown-label { color: var(--text-mid); font-weight: 500; }
 .breakdown-value { color: var(--purple); font-weight: 700; }
 .breakdown-value--highlight { color: var(--green); }
+
+.breakdown-item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.76rem;
+  padding: 0.1rem 0;
+}
+.breakdown-item-label { color: var(--text-mid); font-weight: 500; }
+.breakdown-item-value { color: var(--purple); font-weight: 600; white-space: nowrap; }
+.breakdown-item-value--riesgo { color: var(--warn); }
+
+.breakdown-row--subtotal {
+  border-top: 1px dashed var(--border);
+  margin-top: 0.3rem;
+  padding-top: 0.3rem;
+  font-weight: 700;
+}
+.breakdown-row--total {
+  border-top: 1px solid var(--border);
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+}
+
+.breakdown-empty {
+  font-size: 0.72rem;
+  color: var(--muted);
+  padding: 0.3rem 0;
+}
+
+.breakdown-divider { height: 1px; background: var(--border); margin: 0.3rem 0; }
 </style>
