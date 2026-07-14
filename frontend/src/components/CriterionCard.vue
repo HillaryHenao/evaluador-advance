@@ -11,6 +11,13 @@ const module = computed(() => loadCriteria().find(c => c.id === props.result.id)
 
 const accentColor = computed(() => {
   if (!props.result.formulaDefined) return '#ea580c'
+  if (module.value?.scope === 'proyecto') {
+    const results = store.perProjectResults
+    const tieneDatos = store.proyectoNombres.some(
+      nombre => results[nombre]?.find(r => r.id === props.result.id)?.value !== null,
+    )
+    return tieneDatos ? 'var(--purple)' : 'var(--border)'
+  }
   if (props.result.value !== null) return 'var(--purple)'
   return 'var(--border)'
 })
@@ -45,6 +52,28 @@ const checklistGroups = computed(() => {
   return order.map(key => groups.get(key)!)
 })
 
+const isProyectoScope = computed(() => module.value?.scope === 'proyecto')
+
+const proyectoRows = computed(() => {
+  if (!isProyectoScope.value) return []
+  const results = store.perProjectResults
+  return store.proyectoNombres.map(nombre => {
+    const result = results[nombre]?.find(r => r.id === props.result.id)
+    return {
+      nombre,
+      value: result?.value ?? null,
+      sobrecosto: result?.sobrecosto ?? 0,
+    }
+  })
+})
+
+const proyectoTotal = computed(() => proyectoRows.value.reduce((acc, row) => acc + row.sobrecosto, 0))
+
+function handlePilotesToggle(nombre: string, event: Event) {
+  const target = event.target as HTMLInputElement
+  store.setPilotesForProyecto(nombre, target.checked)
+}
+
 function handleChecklistToggle(key: string, event: Event) {
   const target = event.target as HTMLInputElement
   const updated = { ...checklistValue.value, [key]: { ...checklistItem(key), activo: target.checked } } as ObrasHidraulicasValue
@@ -76,11 +105,6 @@ const coexistenciasDetalle = computed(() => {
 const servidumbreDetalle = computed(() => {
   if (props.result.id !== 'servidumbre') return null
   return store.terrainData?.servidumbre_detalle ?? null
-})
-
-const aprovechamientoDetalle = computed(() => {
-  if (props.result.id !== 'aprovechamiento_forestal') return []
-  return store.terrainData?.aprovechamiento_forestal_detalle ?? []
 })
 
 const ocupacionCauceDetalle = computed(() => {
@@ -118,7 +142,7 @@ function handleToggle(event: Event) {
     </div>
 
     <div class="card-input" :class="{ 'card-input--checklist': module?.inputType === 'checklist' }">
-      <template v-if="module?.inputType === 'number'">
+      <template v-if="module?.inputType === 'number' && !isProyectoScope">
         <input
           type="number"
           :value="result.value as number ?? ''"
@@ -130,7 +154,7 @@ function handleToggle(event: Event) {
         <span v-if="module.unit" class="input-unit">{{ module.unit }}</span>
       </template>
 
-      <template v-else-if="module?.inputType === 'toggle'">
+      <template v-else-if="module?.inputType === 'toggle' && !isProyectoScope">
         <label class="toggle-label">
           <input
             type="checkbox"
@@ -143,7 +167,7 @@ function handleToggle(event: Event) {
         </label>
       </template>
 
-      <template v-else-if="module?.inputType === 'select'">
+      <template v-else-if="module?.inputType === 'select' && !isProyectoScope">
         <select
           :value="result.value as string ?? ''"
           :disabled="result.fromDb"
@@ -185,10 +209,40 @@ function handleToggle(event: Event) {
           </div>
         </div>
       </template>
+
+      <template v-else-if="isProyectoScope && result.id !== 'pilotes'">
+        <div class="proyecto-rows">
+          <div v-for="row in proyectoRows" :key="row.nombre" class="proyecto-row">
+            <span class="proyecto-row-nombre">{{ row.nombre }}</span>
+            <span class="proyecto-row-valor">{{ row.value ?? '—' }}{{ module?.unit ? ` ${module.unit}` : '' }}</span>
+            <span class="proyecto-row-sobrecosto">{{ formatCOP(row.sobrecosto) }}</span>
+          </div>
+          <div class="proyecto-row proyecto-row--total">
+            <span class="proyecto-row-nombre">Total</span>
+            <span class="proyecto-row-sobrecosto">{{ formatCOP(proyectoTotal) }}</span>
+          </div>
+        </div>
+      </template>
+
+      <template v-else-if="isProyectoScope && result.id === 'pilotes'">
+        <div class="proyecto-rows">
+          <div v-for="nombre in store.proyectoNombres" :key="nombre" class="proyecto-row">
+            <label class="toggle-label">
+              <input
+                type="checkbox"
+                :checked="store.perProjectValues.pilotes?.[nombre] === true"
+                class="toggle-checkbox"
+                @change="handlePilotesToggle(nombre, $event)"
+              />
+              <span>{{ nombre }}</span>
+            </label>
+          </div>
+        </div>
+      </template>
     </div>
 
     <!-- Criterio fijo: muestra COP -->
-    <div class="card-cost" v-if="result.formulaDefined && result.category !== 'probabilidad'">
+    <div class="card-cost" v-if="result.formulaDefined && result.category !== 'probabilidad' && !isProyectoScope">
       <span class="cost-label">{{ result.sobrecosto < 0 ? 'Ahorro' : 'Sobrecosto' }}</span>
       <span
         class="cost-value"
@@ -230,19 +284,6 @@ function handleToggle(event: Event) {
         <span class="coexistencia-entidad">{{ servidumbreDetalle.tipo }}</span>
         <span class="coexistencia-estado" :class="{ 'coexistencia-estado--ok': servidumbreDetalle.estado === 'Aprobada' }">
           {{ servidumbreDetalle.estado }}
-        </span>
-      </div>
-    </div>
-
-    <!-- Aprovechamiento forestal: detalle por proyecto (puede variar entre proyectos del mismo terreno) -->
-    <div class="coexistencias-detalle" v-if="result.id === 'aprovechamiento_forestal' && aprovechamientoDetalle.length > 0">
-      <div v-for="(item, idx) in aprovechamientoDetalle" :key="idx" class="coexistencia-row">
-        <span class="coexistencia-entidad">{{ item.proyecto }}</span>
-        <span
-          class="coexistencia-estado"
-          :class="{ 'coexistencia-estado--ok': item.estado === 'Exonerado' || item.estado === 'Solicitud aprobada' }"
-        >
-          {{ item.estado }}
         </span>
       </div>
     </div>
@@ -454,5 +495,23 @@ function handleToggle(event: Event) {
 .coexistencia-estado--ok {
   color: var(--green);
   background: rgba(22, 163, 74, 0.08);
+}
+
+.proyecto-rows { display: flex; flex-direction: column; gap: 0.4rem; width: 100%; }
+.proyecto-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+}
+.proyecto-row-nombre { color: var(--text-mid); flex: 1; }
+.proyecto-row-valor { color: var(--text); font-weight: 600; white-space: nowrap; }
+.proyecto-row-sobrecosto { color: var(--purple); font-weight: 700; white-space: nowrap; }
+.proyecto-row--total {
+  border-top: 1px dashed var(--border);
+  padding-top: 0.4rem;
+  margin-top: 0.2rem;
+  font-weight: 700;
 }
 </style>
