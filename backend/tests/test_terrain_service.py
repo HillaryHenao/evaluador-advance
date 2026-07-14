@@ -67,6 +67,35 @@ def test_get_proyectos_activos_devuelve_datos_por_proyecto():
     ]
 
 
+def test_get_proyectos_activos_arboles_cero_cuando_forestal_resuelto_sin_dato():
+    # COLBOYT147 (caso real): forestal viene 'Exonerado' (resuelto) pero el campo
+    # 'Número de árboles' nunca se diligenció en origen (numero_arboles_raw=None) — se
+    # asume 0 árboles en vez de dejarlo sin dato, ya que un forestal resuelto implica que
+    # no queda pendiente ningún trámite por árboles. Si forestal NO está resuelto (P2,
+    # 'Visita'), la ausencia de dato de árboles se mantiene como None (sin inferir nada).
+    rows = [
+        {
+            'nombre': 'COLBOYT147P1_TUNJA_OCCIDENTE',
+            'distancia_via': 20.0, 'distancia_red': 190.0,
+            'tipo_raw': '1P TRACKER', 'numero_arboles_raw': None,
+            'aprov_value': 'Exonerado', 'aprov_status': 'pending',
+        },
+        {
+            'nombre': 'COLBOYT147P2_TUNJA_OCCIDENTE',
+            'distancia_via': 20.0, 'distancia_red': 190.0,
+            'tipo_raw': '1P TRACKER', 'numero_arboles_raw': None,
+            'aprov_value': 'Visita', 'aprov_status': 'pending',
+        },
+    ]
+    with patch.object(terrain_service, '_connect', return_value=_mock_conn(rows)):
+        proyectos = terrain_service._get_proyectos_activos(287)
+
+    assert proyectos[0]['numero_arboles'] == 0
+    assert proyectos[0]['aprovechamiento_forestal'] is None
+    assert proyectos[1]['numero_arboles'] is None
+    assert proyectos[1]['aprovechamiento_forestal'] == 'visita'
+
+
 def test_get_proyectos_activos_sin_proyectos():
     with patch.object(terrain_service, '_connect', return_value=_mock_conn([])):
         assert terrain_service._get_proyectos_activos(287) == []

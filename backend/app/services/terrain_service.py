@@ -352,12 +352,21 @@ def _get_proyectos_activos(terrain_id: int) -> list[dict]:
         else:
             tipo_estructura = None
 
-        arboles_raw = (r['numero_arboles_raw'] or '').strip()
-        numero_arboles = int(arboles_raw) if arboles_raw.isdigit() else None
-
         aprov_raw = (r['aprov_value'] or '').strip()
         if not aprov_raw and r['aprov_status'] == 'exonerated':
             aprov_raw = 'Exonerado'
+
+        # Un forestal resuelto (Exonerado/Solicitud aprobada) no deja trámite de árboles
+        # pendiente — si nadie diligenció el conteo en ese caso, se asume 0 en vez de
+        # dejarlo sin dato (ver caso real COLBOYT147). Si el forestal NO está resuelto,
+        # la ausencia de conteo se mantiene como "sin dato" (None).
+        arboles_raw = (r['numero_arboles_raw'] or '').strip()
+        if arboles_raw.isdigit():
+            numero_arboles = int(arboles_raw)
+        elif aprov_raw.lower() in _APROV_RESUELTO:
+            numero_arboles = 0
+        else:
+            numero_arboles = None
 
         proyectos.append({
             'nombre': r['nombre'],
