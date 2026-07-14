@@ -17,13 +17,13 @@ function formatCOP(value: number): string {
 
 const fijoBreakdown = computed(() =>
   store.aggregated.breakdown.filter(
-    r => (r.category === 'fijo' || r.category === 'ambas') && r.formulaDefined && r.value !== null && r.sobrecosto !== 0,
+    r => (r.category === 'fijo' || r.category === 'ambas') && r.formulaDefined && r.sobrecosto !== 0,
   ),
 )
 
 const retrasoBreakdown = computed(() =>
   store.aggregated.breakdown.filter(
-    r => r.category === 'probabilidad' && r.formulaDefined && r.value !== null && r.sobrecosto > 0,
+    r => r.category === 'probabilidad' && r.formulaDefined && r.sobrecosto > 0,
   ),
 )
 
