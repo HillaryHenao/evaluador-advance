@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { loadCriteria, evaluateCriteria, aggregateCosts } from '../evaluatorEngine'
+import { loadCriteria, evaluateCriteria, aggregateCosts, evaluateScoped } from '../evaluatorEngine'
 import comunidad from '@/criteria/comunidad'
 import type { EvalContext } from '@/types'
 
@@ -7,7 +7,6 @@ const ctx: EvalContext = { baseCapex: 4_000_000_000, kWp: 1320 }
 
 beforeEach(() => {
   // Reset cache between tests
-  // @ts-expect-error accessing module internals for test reset
   // The cache is module-level; re-importing is not needed — glob is eager
 })
 
@@ -61,12 +60,24 @@ describe('evaluateCriteria', () => {
 })
 
 describe('aggregateCosts', () => {
-  it('suma al CAPEX solo los criterios fijos/ambas con formulaDefined=true y valor distinto de null', () => {
+  it('suma al CAPEX solo los criterios fijos/ambas con formulaDefined=true', () => {
     const values = { corte: 100, lleno: 10, pilotes: true }
     const results = evaluateCriteria(values, ctx)
     const aggregated = aggregateCosts(results, ctx)
     const expected = 100 * 80_000 + 10 * 210_000 + 156_000_000
     expect(aggregated.totalSobrecostoFijo).toBe(expected)
+  })
+
+  it('cuenta un resultado con value=null pero sobrecosto real distinto de cero (caso scope proyecto de evaluateScoped)', () => {
+    const results = [
+      {
+        id: 'numero_arboles', label: 'Número de árboles', value: null, sobrecosto: 285_000,
+        formulaDefined: true, fromDb: true, category: 'fijo' as const,
+      },
+    ]
+    const aggregated = aggregateCosts(results, ctx)
+    expect(aggregated.totalSobrecostoFijo).toBe(285_000)
+    expect(aggregated.capexTotal).toBe(ctx.baseCapex + 285_000)
   })
 
   it('calcula capexTotal = baseCapex + totalSobrecostoFijo', () => {
@@ -98,5 +109,56 @@ describe('aggregateCosts', () => {
     const results = evaluateCriteria({}, ctx)
     const aggregated = aggregateCosts(results, ctx)
     expect(aggregated.breakdown).toHaveLength(18)
+  })
+})
+
+describe('evaluateScoped', () => {
+  const proyectoNombres = ['P1', 'P2']
+  const scopedCtx = { ...ctx, projectCount: 2 }
+
+  it('scope proyecto: general suma el costo de cada proyecto; por proyecto usa su propio valor', () => {
+    const values = {}
+    const perProjectValues = { numero_arboles: { P1: 2, P2: 3 } }
+    const { general, porProyecto } = evaluateScoped(values, perProjectValues, proyectoNombres, scopedCtx)
+
+    const generalArboles = general.find(r => r.id === 'numero_arboles')
+    expect(generalArboles?.sobrecosto).toBe(2 * 142_500 + 3 * 142_500)
+    expect(generalArboles?.value).toBeNull()
+
+    expect(porProyecto['P1'].find(r => r.id === 'numero_arboles')?.sobrecosto).toBe(2 * 142_500)
+    expect(porProyecto['P2'].find(r => r.id === 'numero_arboles')?.sobrecosto).toBe(3 * 142_500)
+  })
+
+  it('scope terreno_dividido: general usa el costo completo; por proyecto lo divide entre N', () => {
+    const values = { corte: 100 }
+    const { general, porProyecto } = evaluateScoped(values, {}, proyectoNombres, scopedCtx)
+
+    expect(general.find(r => r.id === 'corte')?.sobrecosto).toBe(100 * 80_000)
+    expect(porProyecto['P1'].find(r => r.id === 'corte')?.sobrecosto).toBe((100 * 80_000) / 2)
+    expect(porProyecto['P2'].find(r => r.id === 'corte')?.sobrecosto).toBe((100 * 80_000) / 2)
+  })
+
+  it('scope terreno_multiplicado: general multiplica por N; por proyecto usa el costo completo sin dividir', () => {
+    const values = { nivel_tension: '34.5kV' }
+    const { general, porProyecto } = evaluateScoped(values, {}, proyectoNombres, scopedCtx)
+
+    expect(general.find(r => r.id === 'nivel_tension')?.sobrecosto).toBe(30_000_000 * 2)
+    expect(porProyecto['P1'].find(r => r.id === 'nivel_tension')?.sobrecosto).toBe(30_000_000)
+    expect(porProyecto['P2'].find(r => r.id === 'nivel_tension')?.sobrecosto).toBe(30_000_000)
+  })
+
+  it('scope terreno_no_dividido: general sin cambios; no aparece por proyecto', () => {
+    const values = { cluster: 2 }
+    const { general, porProyecto } = evaluateScoped(values, {}, proyectoNombres, scopedCtx)
+
+    expect(general.find(r => r.id === 'cluster')?.sobrecosto).toBe(-15_000_000)
+    expect(porProyecto['P1'].find(r => r.id === 'cluster')).toBeUndefined()
+    expect(porProyecto['P2'].find(r => r.id === 'cluster')).toBeUndefined()
+  })
+
+  it('sin proyectos activos (projectCount ausente): terreno_dividido no divide (usa 1)', () => {
+    const values = { corte: 100 }
+    const { general } = evaluateScoped(values, {}, [], ctx)
+    expect(general.find(r => r.id === 'corte')?.sobrecosto).toBe(100 * 80_000)
   })
 })

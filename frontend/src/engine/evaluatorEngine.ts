@@ -46,11 +46,68 @@ export function evaluateCriteria(
   })
 }
 
+export interface ScopedEvaluation {
+  general: CriterionResult[]
+  porProyecto: Record<string, CriterionResult[]>
+}
+
+export function evaluateScoped(
+  values: CriterionValues,
+  perProjectValues: Record<string, Record<string, CriterionValue>>,
+  proyectoNombres: string[],
+  context: EvalContext,
+): ScopedEvaluation {
+  const criteria = loadCriteria()
+  const n = context.projectCount ?? 1
+
+  const general: CriterionResult[] = []
+  const porProyecto: Record<string, CriterionResult[]> = {}
+  for (const nombre of proyectoNombres) porProyecto[nombre] = []
+
+  for (const criterion of criteria) {
+    const base = {
+      id: criterion.id,
+      label: criterion.label,
+      formulaDefined: criterion.formulaDefined,
+      fromDb: criterion.dataSource === 'db',
+      category: criterion.category,
+      riskType: criterion.riskType,
+    }
+
+    if (criterion.scope === 'proyecto') {
+      const valoresPorProyecto = perProjectValues[criterion.id] ?? {}
+      let sumaGeneral = 0
+      for (const nombre of proyectoNombres) {
+        const value = valoresPorProyecto[nombre] ?? null
+        const sobrecosto = criterion.formulaDefined ? criterion.computeCost(value, context) : 0
+        sumaGeneral += sobrecosto
+        porProyecto[nombre].push({ ...base, value, sobrecosto })
+      }
+      general.push({ ...base, value: null, sobrecosto: sumaGeneral })
+      continue
+    }
+
+    const value = values[criterion.id] ?? null
+    const costoBase = criterion.formulaDefined ? criterion.computeCost(value, context) : 0
+    const costoGeneral = criterion.scope === 'terreno_multiplicado' ? costoBase * n : costoBase
+    general.push({ ...base, value, sobrecosto: costoGeneral })
+
+    if (criterion.scope === 'terreno_no_dividido') continue
+
+    const costoPorProyecto = criterion.scope === 'terreno_multiplicado' ? costoBase : costoBase / n
+    for (const nombre of proyectoNombres) {
+      porProyecto[nombre].push({ ...base, value, sobrecosto: costoPorProyecto })
+    }
+  }
+
+  return { general, porProyecto }
+}
+
 export function aggregateCosts(
   results: CriterionResult[],
   context: EvalContext,
 ): AggregatedResult {
-  const active = results.filter(r => r.formulaDefined && r.value !== null)
+  const active = results.filter(r => r.formulaDefined)
 
   const totalSobrecostoFijo = active
     .filter(r => r.category === 'fijo' || r.category === 'ambas')
