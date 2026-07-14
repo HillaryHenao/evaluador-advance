@@ -1,109 +1,111 @@
-# Task 3 Report: Datos macro + utilidades matemáticas (IRR/NPV)
+# Task 3 Report: Frontend engine — scope-aware evaluation
 
-## Status
-DONE
+## Implementation Summary
 
-## What was implemented
+Successfully implemented `evaluateScoped` function and fixed `aggregateCosts` filter to enable scope-aware evaluation with both general terrain-wide totals and per-project breakdowns in a single pass.
 
-1. `frontend/src/engine/financialData.ts` — literal macro assumption tables transcribed
-   exactly from the task brief:
-   - `AÑO_BASE = 2026`
-   - `IPC: number[]` (34 elements)
-   - `FX: number[]` (34 elements)
-   - `PPA_CON_INDEXACION: number[]` (34 elements)
-   - `MANTENIMIENTO_TRACKER: Record<number, number>` (5 entries, periods 6/11/16/21/26)
-   - `REEMPLAZO_INVERSORES: Record<number, number>` (1 entry, period 16)
+## What Was Implemented
 
-2. `frontend/src/engine/financialMath.ts` — generic, pure math utilities:
-   - `npv(rate, cashflows)` — Excel-style NPV (discounts `cashflows[0]` to t=1, i.e. does
-     NOT include a t=0 flow; that's added separately by the caller, same convention as
-     Excel's `NPV(...)+C38`).
-   - `irr(cashflows, guess = 0.1)` — Newton-Raphson root-finder on the full VPN function
-     (where `cashflows[0]` IS the t=0 flow), 100 iterations, 1e-9 convergence tolerance,
-     bails out if the derivative underflows (1e-12).
+### 1. **`evaluateScoped` Function** (evaluatorEngine.ts, lines 54-104)
+- New exported function that computes both general and per-project cost breakdowns simultaneously
+- Signature: `evaluateScoped(values, perProjectValues, proyectoNombres, context): ScopedEvaluation`
+- Implements all 4 scope types correctly:
+  - **scope `proyecto`**: General sums all project costs (with `value: null`); per-project uses individual project values
+  - **scope `terreno_dividido`**: General uses full cost; per-project divides by N (number of projects)
+  - **scope `terreno_multiplicado`**: General multiplies base cost by N; per-project uses base cost (no multiplication)
+  - **scope `terreno_no_dividido`**: General includes; per-project excluded (not listed for individual projects)
 
-3. `frontend/src/engine/__tests__/financialMath.test.ts` — 3 tests covering `npv` (simple
-   2-period flow) and `irr` (2-period exact 10% case, and a 5-period flow with a
-   known ~24.89% IRR).
+### 2. **ScopedEvaluation Interface** (evaluatorEngine.ts, lines 49-52)
+- Defines return type with `general: CriterionResult[]` and `porProyecto: Record<string, CriterionResult[]>`
 
-Neither module imports from or depends on Task 1/2 work; both are pure, self-contained
-data/math with no side effects, as scoped.
+### 3. **aggregateCosts Filter Fix** (evaluatorEngine.ts, line 110)
+- Changed filter from `r.formulaDefined && r.value !== null` to `r.formulaDefined`
+- Allows results with `value: null` (like scope-`proyecto` criteria from `evaluateScoped`) to contribute their computed `sobrecosto`
 
-## TDD Evidence
+### 4. **Test Suite Enhancements**
 
-### RED
+Updated `evaluatorEngine.test.ts`:
+- Renamed test: "suma al CAPEX solo los criterios fijos/ambas con formulaDefined=true" (removed "valor distinto de null" requirement)
+- Added 5 new `evaluateScoped` tests:
+  - Scope `proyecto`: Verifies general sums project costs and per-project uses individual values
+  - Scope `terreno_dividido`: Verifies general uses full cost, per-project divides by N
+  - Scope `terreno_multiplicado`: Verifies general multiplies by N, per-project uses base cost
+  - Scope `terreno_no_dividido`: Verifies general included, per-project excluded
+  - Edge case: No active projects (projectCount absent) → uses n=1
+- Added new `aggregateCosts` test: "cuenta un resultado con value=null pero sobrecosto real distinto de cero"
 
-Command:
+## Test Results
+
+### GREEN — All tests pass:
 ```
-cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
-npx vitest run financialMath
-```
-
-Output (abridged):
-```
-FAIL  src/engine/__tests__/financialMath.test.ts [ src/engine/__tests__/financialMath.test.ts ]
-Error: Failed to resolve import "../financialMath" from "src/engine/__tests__/financialMath.test.ts". Does the file exist?
-...
- Test Files  1 failed (1)
-      Tests  no tests
+Test Files  1 passed (1)
+Tests       17 passed (17)
 ```
 
-Failed for the expected reason: `financialMath.ts` did not exist yet. `financialData.ts`
-was already created at this point (Step 1 in the brief happens before the test), but the
-test file only imports from `../financialMath`, so this failure is unrelated to
-`financialData.ts` correctness.
+### Test Evidence
+- `evaluateScoped` tests exercise all 4 scope types with actual computation verification
+- Division/multiplication logic tested with explicit expected values:
+  - `numero_arboles`: 2×142,500 + 3×142,500 per-project sums to general total
+  - `corte` (terreno_dividido): 100×80,000 → divided by 2 per project
+  - `nivel_tension` (terreno_multiplicado): base×2 for general, base per-project
+  - `cluster` (terreno_no_dividido): only in general, excluded from per-project
+- `aggregateCosts` null-value fix verified with synthetic result containing `value: null` and real `sobrecosto`
 
-### GREEN
+## Type-Check Results
 
-Command:
 ```
-cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
-npx vitest run financialMath
-```
-
-Output:
-```
- Test Files  1 passed (1)
-      Tests  3 passed (3)
-```
-
-Full suite re-run to confirm no regressions elsewhere:
-```
-npx vitest run
- Test Files  5 passed (5)
-      Tests  56 passed (56)
+3 errors (unchanged from Task 2):
+- src/components/CriterionCard.vue(83,29) — Property 'aprovechamiento_forestal_detalle' (Task 5)
+- src/stores/__tests__/evaluatorStore.test.ts(11,3) — 'distancia_via' not in TerrainData (Task 4)
+- vite.config.ts(13,3) — 'test' not in UserConfigExport (pre-existing)
 ```
 
-## Commit
-8d9a7cb — feat: add IRR/NPV math utilities and macro assumption tables
+These are deferred to Tasks 4-5 as expected. No new errors introduced by this task.
 
-## Files Created
-- `frontend/src/engine/financialData.ts`
-- `frontend/src/engine/financialMath.ts`
-- `frontend/src/engine/__tests__/financialMath.test.ts`
+## Files Changed
 
-## Self-review findings
+1. **frontend/src/engine/evaluatorEngine.ts**
+   - Added `ScopedEvaluation` interface (lines 49-52)
+   - Added `evaluateScoped` function (lines 54-104)
+   - Fixed `aggregateCosts` filter (line 110)
 
-- Extracted the three ```ts code blocks from `task-3-brief.md` programmatically (regex
-  over the raw markdown) and diffed each one byte-for-byte against the corresponding
-  created file (`financialData.ts`, the test file, and `financialMath.ts`). All three
-  diffs were empty — **confirmed identical, no transcription errors**.
-- Independently counted the elements of `IPC`, `FX`, and `PPA_CON_INDEXACION` via a
-  small script: all three have exactly 34 elements, matching the stated index range
-  (0 = 2026 .. 33 = 2059).
-- Verified `MANTENIMIENTO_TRACKER` has the 5 specified period keys (6, 11, 16, 21, 26)
-  and `REEMPLAZO_INVERSORES` has the 1 specified key (16), with values matching the
-  brief exactly (checked as part of the whole-file diff above).
-- Verified `npv`/`irr` implementations match the brief's code exactly (whole-file diff,
-  no edits made beyond what the brief specified).
-- Confirmed the tests genuinely exercise the functions: they were RED before
-  `financialMath.ts` existed (import failure) and GREEN after implementing it, with
-  no other file changes in between — not a trivial/tautological pass.
-- Ran the full project test suite (`npx vitest run`) after the change: 56/56 tests pass
-  across 5 files, no regressions.
-- No stray/temporary files were left in the repo; `git status` before commit showed only
-  the three intended new files as untracked, and the commit added exactly those three.
+2. **frontend/src/engine/__tests__/evaluatorEngine.test.ts**
+   - Added import of `evaluateScoped` (line 2)
+   - Updated test name: removed "valor distinto de null" requirement (line 64)
+   - Added new `aggregateCosts` null-value test (lines 72-78)
+   - Added 5 new `evaluateScoped` describe block with all scope tests (lines 105-160)
+   - Removed unused `@ts-expect-error` directive (line 10)
+
+## Self-Review Findings
+
+✓ **Scope handling**: All 4 scopes implemented correctly
+  - `proyecto`: Sums projects in general, individual values per-project
+  - `terreno_dividido`: Full cost general, divided per-project (÷N)
+  - `terreno_multiplicado`: Multiplied general (×N), base per-project
+  - `terreno_no_dividido`: General only, excluded from per-project
+
+✓ **Division/multiplication logic**: Thoroughly tested
+  - Division tests use concrete expected values (e.g., 8,000,000 ÷ 2 = 4,000,000)
+  - Multiplication tests verify N×base in general and base in per-project
+
+✓ **aggregateCosts filter**: Minimal change (one operator removed)
+  - Only the filter condition changed; no other behavior affected
+  - Now accepts `value: null` when `sobrecosto` is real
+
+✓ **Test coverage**: New tests exercise actual computation, not just function calls
+  - Each test verifies concrete values from `computeCost` results
+  - All 4 scope types covered with explicit assertions
+
+✓ **No modifications to `evaluateCriteria`**: Function remains unchanged, as required
+
+✓ **Backward compatibility**: Existing tests all pass; `evaluateCriteria` still works for existing callers
 
 ## Concerns
-None. Numbers, formulas, and test results all match the brief exactly; no ambiguity was
-encountered.
+
+None. The implementation follows the brief exactly, all tests pass, and type-check shows only expected pre-existing errors from Tasks 4-5.
+
+## Commit
+
+```
+a4effb3 feat: add evaluateScoped for scope-aware general total + per-project breakdown
+```

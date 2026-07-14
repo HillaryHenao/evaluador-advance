@@ -1,219 +1,249 @@
-### Task 2: Checklist UI in `CriterionCard.vue`
+### Task 2: Frontend types — `CriterionScope`, `ProyectoData`, `EvalContext.projectCount`
 
 **Files:**
-- Modify: `frontend/src/components/CriterionCard.vue:5` (import types), `:10-16` (add computeds/helpers after `accentColor`), `:66-77` (add dynamic class to `.card-input`), `:103-116` (add checklist template branch), `:293-294` (add checklist CSS)
+- Modify: `frontend/src/types/index.ts`
+- Modify: all 18 files in `frontend/src/criteria/*.ts` (add `scope` field)
+- Modify: `frontend/src/engine/__tests__/evaluatorEngine.test.ts` (add scope coverage test)
 
 **Interfaces:**
-- Consumes: `ObrasHidraulicasValue`, `ObraHidraulicaItem` from `@/types` (Task 1). `CriterionModule.checklistItems: ChecklistItemDef[]` (Task 1) via the existing `module` computed (`CriterionCard.vue:10`).
-- Consumes: `store.setCriterionValue(id: string, value: CriterionValue): void` (existing, unchanged, `evaluatorStore.ts:68`).
+- Consumes: nothing from Task 1 directly (this is a pure frontend type change; Task 4 wires the new `proyectos` field into the store).
+- Produces (used by Task 3, Task 4): `CriterionScope` type, `ProyectoData` interface, `CriterionModule.scope: CriterionScope` (now required on every module), `EvalContext.projectCount: number`.
 
-- [ ] **Step 1: Update the type import**
+- [ ] **Step 1: Update `frontend/src/types/index.ts`**
 
-Find (line 5):
+Find (line 1):
 
 ```ts
-import type { CriterionResult } from '@/types'
+export interface ObraHidraulicaItem {
+```
+
+Insert immediately before it:
+
+```ts
+export type CriterionScope = 'proyecto' | 'terreno_dividido' | 'terreno_multiplicado' | 'terreno_no_dividido'
+
+export interface ProyectoData {
+  nombre: string
+  distancia_via: number | null
+  distancia_red: number | null
+  aprovechamiento_forestal: string | null
+  numero_arboles: number | null
+  tipo_estructura: string | null
+}
+
+```
+
+Find (lines 15-18):
+
+```ts
+export interface EvalContext {
+  baseCapex: number
+  kWp: number
+}
 ```
 
 Replace with:
 
 ```ts
-import type { CriterionResult, ObrasHidraulicasValue, ObraHidraulicaItem } from '@/types'
+export interface EvalContext {
+  baseCapex: number
+  kWp: number
+  projectCount?: number
+}
 ```
 
-- [ ] **Step 2: Add checklist computeds and event handlers**
+`projectCount` is optional so this change alone does not break type-checking on files this task doesn't touch: `evaluatorStore.ts`'s existing `context` computed (not updated until Task 4) and the pre-existing `ctx` test fixtures in `criteria.test.ts`/`evaluatorEngine.test.ts` (which never set it, since none of the 18 `computeCost` formulas read it) all keep compiling unchanged. `evaluateScoped` (Task 3) is the only place that reads `projectCount`, and it defaults to `1` when absent.
 
-Find this block (lines 12-16):
+Find (lines 62-75):
 
 ```ts
-const accentColor = computed(() => {
-  if (!props.result.formulaDefined) return '#ea580c'
-  if (props.result.value !== null) return 'var(--purple)'
-  return 'var(--border)'
-})
-```
-
-Immediately after it (before `function formatCOP`), insert:
-
-```ts
-
-const EMPTY_OBRAS_HIDRAULICAS: ObrasHidraulicasValue = {
-  canal_concreto: { activo: false, cantidad: null },
-  cuneta_via: { activo: false, cantidad: null },
-  box_culvert: { activo: false, cantidad: null },
-  alcantarilla_cruce: { activo: false, cantidad: null },
+export interface CriterionModule {
+  id: string
+  label: string
+  inputType: 'number' | 'toggle' | 'select' | 'checklist'
+  unit?: string
+  dataSource: 'manual' | 'db' | 'db_or_manual'
+  dbField?: string
+  options?: SelectOption[]
+  formulaDefined: boolean
+  category: CriterionCategory
+  riskType?: RiskType
+  checklistItems?: ChecklistItemDef[]
+  computeCost: (value: CriterionValue, context: EvalContext) => number
 }
-
-const checklistValue = computed<ObrasHidraulicasValue>(() => {
-  const v = props.result.value
-  return (v && typeof v === 'object') ? v as ObrasHidraulicasValue : EMPTY_OBRAS_HIDRAULICAS
-})
-
-function checklistItem(key: string): ObraHidraulicaItem {
-  return checklistValue.value[key as keyof ObrasHidraulicasValue]
-}
-
-const checklistGroups = computed(() => {
-  const items = module.value?.checklistItems ?? []
-  const order: string[] = []
-  const groups = new Map<string, { groupLabel: string; items: typeof items }>()
-  for (const item of items) {
-    if (!groups.has(item.group)) {
-      groups.set(item.group, { groupLabel: item.groupLabel, items: [] })
-      order.push(item.group)
-    }
-    groups.get(item.group)!.items.push(item)
-  }
-  return order.map(key => groups.get(key)!)
-})
-
-function handleChecklistToggle(key: string, event: Event) {
-  const target = event.target as HTMLInputElement
-  const updated = { ...checklistValue.value, [key]: { ...checklistItem(key), activo: target.checked } } as ObrasHidraulicasValue
-  store.setCriterionValue(props.result.id, updated)
-}
-
-function handleChecklistCantidad(key: string, event: Event) {
-  const target = event.target as HTMLInputElement
-  const raw = target.value
-  const updated = { ...checklistValue.value, [key]: { ...checklistItem(key), cantidad: raw === '' ? null : Number(raw) } } as ObrasHidraulicasValue
-  store.setCriterionValue(props.result.id, updated)
-}
-```
-
-- [ ] **Step 3: Give `.card-input` a dynamic modifier class**
-
-Find (line 77):
-
-```html
-    <div class="card-input">
 ```
 
 Replace with:
 
-```html
-    <div class="card-input" :class="{ 'card-input--checklist': module?.inputType === 'checklist' }">
-```
-
-- [ ] **Step 4: Add the checklist template branch**
-
-Find this block (lines 103-115, the `select` branch, ending right before the closing `</div>` of `.card-input` at line 116):
-
-```html
-      <template v-else-if="module?.inputType === 'select'">
-        <select
-          :value="result.value as string ?? ''"
-          :disabled="result.fromDb"
-          class="input-field"
-          @change="handleSelect"
-        >
-          <option value="">— Seleccionar —</option>
-          <option v-for="opt in module.options" :key="opt.value" :value="opt.value">
-            {{ opt.label }}
-          </option>
-        </select>
-      </template>
-    </div>
-```
-
-Replace with (adds the new branch before the closing `</div>`):
-
-```html
-      <template v-else-if="module?.inputType === 'select'">
-        <select
-          :value="result.value as string ?? ''"
-          :disabled="result.fromDb"
-          class="input-field"
-          @change="handleSelect"
-        >
-          <option value="">— Seleccionar —</option>
-          <option v-for="opt in module.options" :key="opt.value" :value="opt.value">
-            {{ opt.label }}
-          </option>
-        </select>
-      </template>
-
-      <template v-else-if="module?.inputType === 'checklist'">
-        <div class="checklist-groups">
-          <div v-for="group in checklistGroups" :key="group.groupLabel" class="checklist-group">
-            <span class="checklist-group-label">{{ group.groupLabel }}</span>
-            <div v-for="item in group.items" :key="item.key" class="checklist-item">
-              <label class="checklist-item-label">
-                <input
-                  type="checkbox"
-                  :checked="checklistItem(item.key).activo"
-                  class="toggle-checkbox"
-                  @change="handleChecklistToggle(item.key, $event)"
-                />
-                <span>{{ item.label }}</span>
-              </label>
-              <div v-if="checklistItem(item.key).activo" class="checklist-item-cantidad">
-                <input
-                  type="number"
-                  :value="checklistItem(item.key).cantidad ?? ''"
-                  :placeholder="`0 ${item.unit}`"
-                  class="input-field input-field--small"
-                  @input="handleChecklistCantidad(item.key, $event)"
-                />
-                <span class="input-unit">{{ item.unit }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </template>
-    </div>
-```
-
-- [ ] **Step 5: Add checklist CSS**
-
-Find (line 294):
-
-```css
-.input-unit { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
-```
-
-Immediately after it, insert:
-
-```css
-
-.card-input--checklist { flex-direction: column; align-items: stretch; }
-
-.checklist-groups { display: flex; flex-direction: column; gap: 0.75rem; width: 100%; }
-.checklist-group { display: flex; flex-direction: column; gap: 0.4rem; }
-.checklist-group-label {
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--muted);
+```ts
+export interface CriterionModule {
+  id: string
+  label: string
+  inputType: 'number' | 'toggle' | 'select' | 'checklist'
+  unit?: string
+  dataSource: 'manual' | 'db' | 'db_or_manual'
+  dbField?: string
+  options?: SelectOption[]
+  formulaDefined: boolean
+  category: CriterionCategory
+  riskType?: RiskType
+  scope: CriterionScope
+  checklistItems?: ChecklistItemDef[]
+  computeCost: (value: CriterionValue, context: EvalContext) => number
 }
-.checklist-item { display: flex; flex-direction: column; gap: 0.35rem; }
-.checklist-item-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-  font-size: 0.82rem;
-  color: var(--text);
-}
-.checklist-item-cantidad { display: flex; align-items: center; gap: 0.5rem; padding-left: 1.6rem; }
-.input-field--small { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
 ```
 
-- [ ] **Step 6: Manual verification against the running dev server**
+Find (lines 77-98):
 
-This project has no automated tests for `.vue` components (only `criteria/`, `engine/`, and `stores/` have `__tests__`), so verify by driving the actual UI, per this repo's established convention.
+```ts
+export interface TerrainData {
+  code: string
+  name: string
+  municipality: string
+  distancia_via: number | null
+  distancia_red: number | null
+  or: string | null
+  nivel_tension: string | null
+  cluster: number | null
+  tipo_estructura: string | null
+  ocupacion_cauce: boolean | null
+  ocupacion_cauce_detalle: string | null
+  servidumbre: number | null
+  servidumbre_detalle: EstadoDetalle | null
+  aprovechamiento_forestal: string | null
+  aprovechamiento_forestal_detalle: ProyectoEstadoDetalle[] | null
+  coexistencias: boolean | null
+  coexistencias_detalle: CoexistenciaDetalle[] | null
+  numero_arboles: number | null
+  produccion_especifica: number | null
+  arriendo_anual: number | null
+}
+```
 
-1. Ensure the backend (`http://127.0.0.1:5000`) and frontend (`http://127.0.0.1:5173`) dev servers are running.
-2. Open `http://127.0.0.1:5173` in a browser, search a terrain code (e.g. `COLCEST5`).
-3. Find the "Obras hidráulicas" card. Confirm it shows two group labels ("Costo por metro lineal" and "Costo fijo por cruce") each with their items, and no "Pendiente" badge (since `formulaDefined` is now `true`).
-4. Check "Canal en concreto (2m x 0.5m)" — confirm a quantity field appears. Enter `40`. Confirm the card's "Sobrecosto" shows `$52.000.000` and the `SummaryPanel`/CAPEX total increases by the same amount.
-5. Also check "Box culvert (3m x 3m)" and enter `1`. Confirm the card's total sobrecosto is now `$52.000.000 + $170.000.000 = $222.000.000`, and CAPEX total reflects the combined increase.
-6. Uncheck "Canal en concreto" (leave the `40` in the field). Confirm the sobrecosto drops back to `$170.000.000` (the canal quantity is ignored while unchecked, per spec).
+Replace with:
 
-- [ ] **Step 7: Commit**
+```ts
+export interface TerrainData {
+  code: string
+  name: string
+  municipality: string
+  or: string | null
+  nivel_tension: string | null
+  cluster: number | null
+  ocupacion_cauce: boolean | null
+  ocupacion_cauce_detalle: string | null
+  servidumbre: number | null
+  servidumbre_detalle: EstadoDetalle | null
+  coexistencias: boolean | null
+  coexistencias_detalle: CoexistenciaDetalle[] | null
+  produccion_especifica: number | null
+  arriendo_anual: number | null
+  proyectos: ProyectoData[]
+}
+```
+
+Find (lines 105-108):
+
+```ts
+export interface ProyectoEstadoDetalle {
+  proyecto: string
+  estado: string
+}
+```
+
+Delete this block entirely (no longer used — `aprovechamiento_forestal_detalle` is gone, replaced by `ProyectoData.aprovechamiento_forestal`).
+
+- [ ] **Step 2: Add `scope` to each of the 18 criteria modules**
+
+For each file below, find the `formulaDefined:` or `category:` line shown and add a `scope:` line immediately after `category:` (matching the existing code style, one line, no trailing comma changes needed since TS/the existing files already end object properties with commas throughout).
+
+`frontend/src/criteria/distancia_via.ts` — find `category: 'fijo',` → add after it:
+```ts
+  scope: 'proyecto',
+```
+
+`frontend/src/criteria/distancia_red.ts` — same: find `category: 'fijo',` → add `scope: 'proyecto',` after.
+
+`frontend/src/criteria/numero_arboles.ts` — find `category: 'fijo',` → add `scope: 'proyecto',` after.
+
+`frontend/src/criteria/aprovechamiento_forestal.ts` — find `category: 'fijo',` → add `scope: 'proyecto',` after.
+
+`frontend/src/criteria/pilotes.ts` — find `category: 'fijo',` → add `scope: 'proyecto',` after.
+
+`frontend/src/criteria/tipo_estructura.ts` — find `category: 'probabilidad',` → add `scope: 'proyecto',` after.
+
+`frontend/src/criteria/corte.ts` — find `category: 'fijo',` → add `scope: 'terreno_dividido',` after.
+
+`frontend/src/criteria/lleno.ts` — find `category: 'fijo',` → add `scope: 'terreno_dividido',` after.
+
+`frontend/src/criteria/obras_hidraulicas.ts` — find `category: 'fijo',` → add `scope: 'terreno_dividido',` after.
+
+`frontend/src/criteria/ocupacion_cauce.ts` — find `category: 'fijo',` → add `scope: 'terreno_dividido',` after.
+
+`frontend/src/criteria/coexistencias.ts` — find `category: 'probabilidad',` (immediately followed by `riskType: 'costo',`) → add `scope: 'terreno_dividido',` after `riskType: 'costo',`.
+
+`frontend/src/criteria/comunidad.ts` — find `category: 'probabilidad',` → add `scope: 'terreno_dividido',` after.
+
+`frontend/src/criteria/or.ts` — find `category: 'probabilidad',` → add `scope: 'terreno_dividido',` after.
+
+`frontend/src/criteria/propietario.ts` — find `category: 'probabilidad',` (immediately followed by `riskType: 'costo',`) → add `scope: 'terreno_dividido',` after `riskType: 'costo',`.
+
+`frontend/src/criteria/servidumbre.ts` — find `category: 'probabilidad',` (immediately followed by `riskType: 'meses',`) → add `scope: 'terreno_dividido',` after `riskType: 'meses',`.
+
+`frontend/src/criteria/amenazas.ts` — find `category: 'probabilidad',` (immediately followed by `riskType: 'meses',`) → add `scope: 'terreno_dividido',` after `riskType: 'meses',`.
+
+`frontend/src/criteria/nivel_tension.ts` — find `category: 'fijo',` → add `scope: 'terreno_multiplicado',` after.
+
+`frontend/src/criteria/cluster.ts` — find `category: 'fijo',` → add `scope: 'terreno_no_dividido',` after.
+
+- [ ] **Step 2b: Verify every file was updated**
+
+Run (from `frontend/`):
 
 ```bash
-git add frontend/src/components/CriterionCard.vue
-git commit -m "feat: add grouped checklist UI for obras_hidraulicas criterion"
+grep -L "scope:" src/criteria/*.ts
 ```
+
+Expected: no output (every criteria file except files in `__tests__/` now contains `scope:`). If any filename prints, that file was missed — go back and add its `scope:` line.
+
+- [ ] **Step 3: Write the failing test for scope coverage**
+
+Add this to `frontend/src/engine/__tests__/evaluatorEngine.test.ts`, inside the existing `describe('loadCriteria', ...)` block (after the `'todos tienen id, label e inputType'` test, before its closing `})`):
+
+```ts
+  it('todos tienen un scope válido', () => {
+    const criteria = loadCriteria()
+    const validScopes = ['proyecto', 'terreno_dividido', 'terreno_multiplicado', 'terreno_no_dividido']
+    for (const c of criteria) {
+      expect(validScopes).toContain(c.scope)
+    }
+  })
+```
+
+- [ ] **Step 4: Run the test to verify it passes**
+
+This task adds `scope` as a required field on `CriterionModule` (Step 1) and completes it on all 18 criteria (Step 2) before writing this coverage guard (Step 3) — unlike most tasks in this plan, this isn't new runtime logic to drive with a failing test first; it's a schema field every module must carry, and the test exists to catch future criteria that forget it.
+
+Run (from `frontend/`): `npx vitest run src/engine/__tests__/evaluatorEngine.test.ts`
+
+Expected: PASS, 11/11 tests (10 existing + 1 new) in this file. If it fails, Step 2 missed a file — recheck with the Step 2b grep command.
+
+- [ ] **Step 5: Run the full frontend suite and type-check**
+
+Run (from `frontend/`): `npx vitest run`
+
+Expected: all test files pass (no regressions).
+
+Run (from `frontend/`): `npx vue-tsc -b`
+
+Expected: exactly the 2 pre-existing unrelated errors (see Global Constraints) — no new errors. If you see errors referencing `TerrainData`, `ProyectoEstadoDetalle`, or missing `scope`, a criteria file or a consumer of the deleted `TerrainData` fields still needs fixing — this plan's later tasks (Task 4 fixes `evaluatorStore.ts`, Task 5 fixes `CriterionCard.vue`) resolve their remaining references to the removed fields, so at this exact point in the plan you may see NEW errors in those two files referencing `terrainData.distancia_via` etc. If so, that's expected — note it in your report as `DONE_WITH_CONCERNS` rather than trying to fix files outside this task's scope.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add frontend/src/types/index.ts frontend/src/criteria/*.ts frontend/src/engine/__tests__/evaluatorEngine.test.ts
+git commit -m "feat: add scope classification to CriterionModule, ProyectoData type"
+```
+
+---
+

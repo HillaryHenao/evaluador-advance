@@ -1,144 +1,234 @@
-## Task 3: Datos macro + utilidades matemáticas (IRR/NPV)
+### Task 3: Frontend engine — scope-aware evaluation (general total + per-project breakdown)
 
 **Files:**
-- Create: `frontend/src/engine/financialData.ts`
-- Create: `frontend/src/engine/financialMath.ts`
-- Test: `frontend/src/engine/__tests__/financialMath.test.ts`
+- Modify: `frontend/src/engine/evaluatorEngine.ts`
+- Modify: `frontend/src/engine/__tests__/evaluatorEngine.test.ts`
 
 **Interfaces:**
-- Produces: `IPC: number[]`, `FX: number[]`, `PPA_CON_INDEXACION: number[]` (arrays de 34 elementos, índice 0 = año 2026, índice 33 = año 2059), `AÑO_BASE = 2026`. `irr(cashflows: number[]): number`, `npv(rate: number, cashflows: number[]): number`. Usadas por Task 4/5 (`financialEngine.ts`).
+- Consumes: `CriterionModule.scope` (Task 2), `EvalContext.projectCount` (Task 2).
+- Produces (used by Task 4): `evaluateScoped(values: CriterionValues, perProjectValues: Record<string, Record<string, CriterionValue>>, proyectoNombres: string[], context: EvalContext) => { general: CriterionResult[]; porProyecto: Record<string, CriterionResult[]> }`.
 
-- [ ] **Step 1: Crear `financialData.ts` con las tablas macro exactas del Excel**
+**Why a single combined function, not two separate ones:** the existing `evaluateCriteria` (unchanged, still exported, still used by other tests) computes each criterion's `sobrecosto` from a single shared `values[criterion.id]` — but for scope `proyecto` criteria (distancia_via, distancia_red, aprovechamiento_forestal, numero_arboles, pilotes, tipo_estructura), `criterionValues` no longer holds any value at all (Task 4's `fetchTerrain` skips populating it for these — there's no single shared value, only per-project ones). If the general CAPEX total kept calling plain `evaluateCriteria`, these 6 criteria would silently contribute **$0** to `aggregated.capexTotal` forever. The general total must independently sum each project's own `computeCost` result for `proyecto`-scope criteria, and multiply by N for `terreno_multiplicado` (nivel_tension) — both of which are impossible to express as "one shared value fed through the existing per-criterion formula." `evaluateScoped` computes the general total and the per-project breakdown in the same pass so they can never drift apart from two independent implementations.
 
-```ts
-// Tablas macro extraídas literal de "Supuestos y resultados" filas 97-105 del Excel
-// "Retail Modelo financiero - Plantilla Evaluador.xlsx". Índice 0 = año 2026, índice 33 = año 2059.
+- [ ] **Step 1: Write the failing tests**
 
-export const AÑO_BASE = 2026
-
-export const IPC = [
-  0.064, 0.0523, 0.0406, 0.0372, 0.0333, 0.032, 0.032, 0.032, 0.032, 0.032,
-  0.032, 0.032, 0.032, 0.032, 0.032, 0.032, 0.032, 0.032, 0.032, 0.032,
-  0.032, 0.032, 0.032, 0.032, 0.032, 0.032, 0.032, 0.032, 0.032, 0.032,
-  0.032, 0.032, 0.032, 0.032,
-]
-
-export const FX = [
-  3751.0, 3834.0, 3947.0, 3990.0, 4036.0, 4023.4, 4010.8, 3998.2, 3985.6, 3973,
-  3960.4, 3947.8, 3935.2, 3922.6, 3910, 3897.4, 3884.8, 3872.2, 3859.6, 3847,
-  3834.4, 3821.8, 3809.2, 3796.6, 3784, 3771.4, 3758.8, 3746.2, 3733.6, 3721,
-  3708.4, 3695.8, 3683.2, 3670.6,
-]
-
-// PPA con indexación (COP/kWh) — ya incluye el ajuste por IPP acumulado del Excel (fila 105)
-export const PPA_CON_INDEXACION = [
-  350.9462719, 349.3700922, 343.6267887, 344.7270552, 353.8970224, 363.8061391,
-  371.515938, 374.2800166, 382.1424431, 379.3889236, 376.1816073, 372.4972404,
-  374.1578388, 378.624348, 389.2258297, 398.5363587, 408.0631242, 417.8109361,
-  427.784704, 437.9894391, 448.4302562, 459.1123753, 470.0411238, 481.221938,
-  492.6603657, 504.3620673, 516.3328184, 528.5785117, 541.105159, 553.9188929,
-  567.0259695, 580.43277, 594.1458029, 608.1717064,
-]
-
-// Mantenimiento de tracker (fila 23 del Excel): ocurre cada 5 años empezando en el
-// período 6 (año 2032), con el monto compuesto por IPC desde la ocurrencia anterior.
-// Reemplazo de inversores y motores (fila 22): ocurre una sola vez, período 16 (año 2042).
-// Ambos son valores ya calculados con las tarifas y tipo de cambio fijos del Excel —
-// no dependen de los inputs del terreno (capex/kWp/producción/arriendo), por eso van
-// literales aquí en vez de recalcularse.
-export const MANTENIMIENTO_TRACKER: Record<number, number> = {
-  6: -35_117_188.69,
-  11: -41_107_231.39,
-  16: -48_119_013.38,
-  21: -56_326_815.75,
-  26: -65_934_647.24,
-}
-
-export const REEMPLAZO_INVERSORES: Record<number, number> = {
-  16: -250_052_057,
-}
-```
-
-- [ ] **Step 2: Escribir el test de `irr`/`npv` (falla primero)**
+Add to `frontend/src/engine/__tests__/evaluatorEngine.test.ts`, after the existing `describe('aggregateCosts', ...)` block's closing `})`:
 
 ```ts
-import { describe, it, expect } from 'vitest'
-import { irr, npv } from '../financialMath'
 
-describe('npv', () => {
-  it('calcula el valor presente neto con flujos simples', () => {
-    // -1000 hoy, +600 año1, +600 año2, al 10% -> NPV ≈ 41.32
-    const resultado = npv(0.10, [600, 600]) - 1000
-    expect(resultado).toBeCloseTo(41.32, 1)
+describe('evaluateScoped', () => {
+  const proyectoNombres = ['P1', 'P2']
+  const scopedCtx = { ...ctx, projectCount: 2 }
+
+  it('scope proyecto: general suma el costo de cada proyecto; por proyecto usa su propio valor', () => {
+    const values = {}
+    const perProjectValues = { numero_arboles: { P1: 2, P2: 3 } }
+    const { general, porProyecto } = evaluateScoped(values, perProjectValues, proyectoNombres, scopedCtx)
+
+    const generalArboles = general.find(r => r.id === 'numero_arboles')
+    expect(generalArboles?.sobrecosto).toBe(2 * 142_500 + 3 * 142_500)
+    expect(generalArboles?.value).toBeNull()
+
+    expect(porProyecto['P1'].find(r => r.id === 'numero_arboles')?.sobrecosto).toBe(2 * 142_500)
+    expect(porProyecto['P2'].find(r => r.id === 'numero_arboles')?.sobrecosto).toBe(3 * 142_500)
   })
-})
 
-describe('irr', () => {
-  it('calcula la tasa que hace VPN=0 para un flujo simple', () => {
-    // -1000, +1100 -> IRR = 10%
-    expect(irr([-1000, 1100])).toBeCloseTo(0.10, 4)
+  it('scope terreno_dividido: general usa el costo completo; por proyecto lo divide entre N', () => {
+    const values = { corte: 100 }
+    const { general, porProyecto } = evaluateScoped(values, {}, proyectoNombres, scopedCtx)
+
+    expect(general.find(r => r.id === 'corte')?.sobrecosto).toBe(100 * 80_000)
+    expect(porProyecto['P1'].find(r => r.id === 'corte')?.sobrecosto).toBe((100 * 80_000) / 2)
+    expect(porProyecto['P2'].find(r => r.id === 'corte')?.sobrecosto).toBe((100 * 80_000) / 2)
   })
 
-  it('calcula IRR para un flujo de varios períodos', () => {
-    // -1000, +300, +400, +500, +600 -> IRR conocida ≈ 24.89%
-    expect(irr([-1000, 300, 400, 500, 600])).toBeCloseTo(0.2489, 3)
+  it('scope terreno_multiplicado: general multiplica por N; por proyecto usa el costo completo sin dividir', () => {
+    const values = { nivel_tension: '34.5kV' }
+    const { general, porProyecto } = evaluateScoped(values, {}, proyectoNombres, scopedCtx)
+
+    expect(general.find(r => r.id === 'nivel_tension')?.sobrecosto).toBe(30_000_000 * 2)
+    expect(porProyecto['P1'].find(r => r.id === 'nivel_tension')?.sobrecosto).toBe(30_000_000)
+    expect(porProyecto['P2'].find(r => r.id === 'nivel_tension')?.sobrecosto).toBe(30_000_000)
+  })
+
+  it('scope terreno_no_dividido: general sin cambios; no aparece por proyecto', () => {
+    const values = { cluster: 2 }
+    const { general, porProyecto } = evaluateScoped(values, {}, proyectoNombres, scopedCtx)
+
+    expect(general.find(r => r.id === 'cluster')?.sobrecosto).toBe(-15_000_000)
+    expect(porProyecto['P1'].find(r => r.id === 'cluster')).toBeUndefined()
+    expect(porProyecto['P2'].find(r => r.id === 'cluster')).toBeUndefined()
+  })
+
+  it('sin proyectos activos (projectCount ausente): terreno_dividido no divide (usa 1)', () => {
+    const values = { corte: 100 }
+    const { general } = evaluateScoped(values, {}, [], ctx)
+    expect(general.find(r => r.id === 'corte')?.sobrecosto).toBe(100 * 80_000)
   })
 })
 ```
 
-- [ ] **Step 2b: Correr el test para verificar que falla**
+`aggregateCosts` (existing function, in the same file) has its own bug that would silently defeat the fix above: it filters `results.filter(r => r.formulaDefined && r.value !== null)` before summing anything. Since `evaluateScoped`'s general result deliberately sets `value: null` for scope-`proyecto` criteria (there's no single representative value — only a summed `sobrecosto`), that filter would exclude them from `totalSobrecostoFijo`/`capexTotal` even though `evaluateScoped` computed their sobrecosto correctly. Rename the existing test to stop asserting the soon-to-be-wrong "y valor distinto de null" rule, and add a test proving the new correct behavior.
 
-```bash
-cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
-npx vitest run financialMath
-```
-
-Expected: FAIL — `Cannot find module '../financialMath'`.
-
-- [ ] **Step 3: Implementar `financialMath.ts`**
+Find (the existing `aggregateCosts` test's name and body):
 
 ```ts
-// npv replica Excel NPV(): descuenta cashflows[0] a t=1, cashflows[1] a t=2, etc.
-// (NO incluye el flujo del año 0 — ese se suma aparte, igual que en el Excel: NPV(...)+C38)
-export function npv(rate: number, cashflows: number[]): number {
-  return cashflows.reduce((acc, flujo, i) => acc + flujo / Math.pow(1 + rate, i + 1), 0)
+describe('aggregateCosts', () => {
+  it('suma al CAPEX solo los criterios fijos/ambas con formulaDefined=true y valor distinto de null', () => {
+    const values = { corte: 100, lleno: 10, pilotes: true }
+    const results = evaluateCriteria(values, ctx)
+    const aggregated = aggregateCosts(results, ctx)
+    const expected = 100 * 80_000 + 10 * 210_000 + 156_000_000
+    expect(aggregated.totalSobrecostoFijo).toBe(expected)
+  })
+```
+
+Replace with:
+
+```ts
+describe('aggregateCosts', () => {
+  it('suma al CAPEX solo los criterios fijos/ambas con formulaDefined=true', () => {
+    const values = { corte: 100, lleno: 10, pilotes: true }
+    const results = evaluateCriteria(values, ctx)
+    const aggregated = aggregateCosts(results, ctx)
+    const expected = 100 * 80_000 + 10 * 210_000 + 156_000_000
+    expect(aggregated.totalSobrecostoFijo).toBe(expected)
+  })
+
+  it('cuenta un resultado con value=null pero sobrecosto real distinto de cero (caso scope proyecto de evaluateScoped)', () => {
+    const results = [
+      {
+        id: 'numero_arboles', label: 'Número de árboles', value: null, sobrecosto: 285_000,
+        formulaDefined: true, fromDb: true, category: 'fijo' as const,
+      },
+    ]
+    const aggregated = aggregateCosts(results, ctx)
+    expect(aggregated.totalSobrecostoFijo).toBe(285_000)
+    expect(aggregated.capexTotal).toBe(ctx.baseCapex + 285_000)
+  })
+```
+
+(Leave every other existing test in this `describe('aggregateCosts', ...)` block untouched — only the one named test above changes.)
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run (from `frontend/`): `npx vitest run src/engine/__tests__/evaluatorEngine.test.ts -t "evaluateScoped|aggregateCosts"`
+
+Expected: FAIL — `evaluateScoped` tests fail with `evaluateScoped is not defined` (the function doesn't exist yet), and the new "cuenta un resultado con value=null..." test fails because `aggregateCosts`'s current filter (`r.value !== null`) excludes the synthetic result, giving `totalSobrecostoFijo: 0` instead of the expected `285_000`.
+
+- [ ] **Step 3: Add `evaluateScoped` to `frontend/src/engine/evaluatorEngine.ts`**
+
+Find (right before `export function aggregateCosts`, i.e. immediately after the closing `}` of the existing `evaluateCriteria` function — do not modify `evaluateCriteria` itself, it stays exactly as-is for its existing callers):
+
+```ts
+export function aggregateCosts(
+```
+
+Insert immediately before this line:
+
+```ts
+export interface ScopedEvaluation {
+  general: CriterionResult[]
+  porProyecto: Record<string, CriterionResult[]>
 }
 
-// irr: Newton-Raphson sobre la función VPN completa (cashflows[0] es el flujo en t=0)
-export function irr(cashflows: number[], guess = 0.1): number {
-  const vpnCompleto = (rate: number) =>
-    cashflows.reduce((acc, flujo, t) => acc + flujo / Math.pow(1 + rate, t), 0)
-  const derivada = (rate: number) =>
-    cashflows.reduce((acc, flujo, t) => acc - (t * flujo) / Math.pow(1 + rate, t + 1), 0)
+export function evaluateScoped(
+  values: CriterionValues,
+  perProjectValues: Record<string, Record<string, CriterionValue>>,
+  proyectoNombres: string[],
+  context: EvalContext,
+): ScopedEvaluation {
+  const criteria = loadCriteria()
+  const n = context.projectCount ?? 1
 
-  let rate = guess
-  for (let i = 0; i < 100; i++) {
-    const valor = vpnCompleto(rate)
-    const pendiente = derivada(rate)
-    if (Math.abs(pendiente) < 1e-12) break
-    const siguienteRate = rate - valor / pendiente
-    if (Math.abs(siguienteRate - rate) < 1e-9) return siguienteRate
-    rate = siguienteRate
+  const general: CriterionResult[] = []
+  const porProyecto: Record<string, CriterionResult[]> = {}
+  for (const nombre of proyectoNombres) porProyecto[nombre] = []
+
+  for (const criterion of criteria) {
+    const base = {
+      id: criterion.id,
+      label: criterion.label,
+      formulaDefined: criterion.formulaDefined,
+      fromDb: criterion.dataSource === 'db',
+      category: criterion.category,
+      riskType: criterion.riskType,
+    }
+
+    if (criterion.scope === 'proyecto') {
+      const valoresPorProyecto = perProjectValues[criterion.id] ?? {}
+      let sumaGeneral = 0
+      for (const nombre of proyectoNombres) {
+        const value = valoresPorProyecto[nombre] ?? null
+        const sobrecosto = criterion.formulaDefined ? criterion.computeCost(value, context) : 0
+        sumaGeneral += sobrecosto
+        porProyecto[nombre].push({ ...base, value, sobrecosto })
+      }
+      general.push({ ...base, value: null, sobrecosto: sumaGeneral })
+      continue
+    }
+
+    const value = values[criterion.id] ?? null
+    const costoBase = criterion.formulaDefined ? criterion.computeCost(value, context) : 0
+    const costoGeneral = criterion.scope === 'terreno_multiplicado' ? costoBase * n : costoBase
+    general.push({ ...base, value, sobrecosto: costoGeneral })
+
+    if (criterion.scope === 'terreno_no_dividido') continue
+
+    const costoPorProyecto = criterion.scope === 'terreno_multiplicado' ? costoBase : costoBase / n
+    for (const nombre of proyectoNombres) {
+      porProyecto[nombre].push({ ...base, value, sobrecosto: costoPorProyecto })
+    }
   }
-  return rate
+
+  return { general, porProyecto }
 }
+
 ```
 
-- [ ] **Step 4: Correr el test — debe pasar**
+- [ ] **Step 4: Fix `aggregateCosts`'s null-value filter**
 
-```bash
-cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
-npx vitest run financialMath
+Find:
+
+```ts
+export function aggregateCosts(
+  results: CriterionResult[],
+  context: EvalContext,
+): AggregatedResult {
+  const active = results.filter(r => r.formulaDefined && r.value !== null)
 ```
 
-Expected: PASS (3 tests).
+Replace with:
 
-- [ ] **Step 5: Commit**
+```ts
+export function aggregateCosts(
+  results: CriterionResult[],
+  context: EvalContext,
+): AggregatedResult {
+  const active = results.filter(r => r.formulaDefined)
+```
+
+- [ ] **Step 5: Run tests to verify they pass**
+
+Run (from `frontend/`): `npx vitest run src/engine/__tests__/evaluatorEngine.test.ts`
+
+Expected: PASS — all tests in the file pass, including the 5 new `evaluateScoped` tests and the new `aggregateCosts` null-value test.
+
+- [ ] **Step 6: Run the full suite and type-check**
+
+Run (from `frontend/`): `npx vitest run`
+
+Expected: all test files pass.
+
+Run (from `frontend/`): `npx vue-tsc -b`
+
+Expected: same 2 pre-existing errors as before, plus whatever `TerrainData`-field errors were already present from Task 2 (still expected to be resolved by Task 4 and Task 5 — do not fix them in this task).
+
+- [ ] **Step 7: Commit**
 
 ```bash
-cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance"
-git add frontend/src/engine/financialData.ts frontend/src/engine/financialMath.ts frontend/src/engine/__tests__/financialMath.test.ts
-git commit -m "feat: add IRR/NPV math utilities and macro assumption tables"
+git add frontend/src/engine/evaluatorEngine.ts frontend/src/engine/__tests__/evaluatorEngine.test.ts
+git commit -m "feat: add evaluateScoped for scope-aware general total + per-project breakdown"
 ```
 
 ---

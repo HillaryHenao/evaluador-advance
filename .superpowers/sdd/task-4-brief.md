@@ -1,206 +1,440 @@
-## Task 4: Motor financiero — ingresos, costos y CAPEX año por año
+### Task 4: Frontend store — `perProjectValues`, auto-population, financial per-project VPN
 
 **Files:**
-- Create: `frontend/src/engine/financialEngine.ts`
-- Test: `frontend/src/engine/__tests__/financialEngine.test.ts`
+- Modify: `frontend/src/stores/evaluatorStore.ts`
+- Modify: `frontend/src/stores/__tests__/evaluatorStore.test.ts`
+- Modify: `frontend/src/components/SummaryPanel.vue`
 
 **Interfaces:**
-- Consumes: `IPC`, `FX`, `PPA_CON_INDEXACION`, `AÑO_BASE` de `financialData.ts`; `irr`, `npv` de `financialMath.ts`; `FinancialInputs`, `FinancialResults` de `@/types`.
-- Produces: función interna `calcularFlujosDeCaja(inputs: FinancialInputs): { flujoInversionista: number[] }` — consumida por Task 5 para construir `calcularFinanzas()` (Task 5 agrega el beneficio tributario por separado para obtener el flujo "con beneficios").
+- Consumes: `TerrainData.proyectos` (Task 1/2), `evaluateScoped` (Task 3), `EvalContext.projectCount` (Task 2), `calcularFinanzas` (existing, unchanged signature).
+- Produces (used by Task 5, Task 6): store getters `perProjectValues: Record<string, Record<string, CriterionValue>>`, `perProjectResults: Record<string, CriterionResult[]>` (computed), `perProjectFinancials: Record<string, { vpn: number; vpnConBeneficios: number }>` (computed), `setPilotesForProyecto(nombre: string, value: boolean): void`.
 
-- [ ] **Step 1: Escribir el test de generación de ingresos (falla primero)**
+- [ ] **Step 1: Write the failing tests**
 
-Crea `frontend/src/engine/__tests__/financialEngine.test.ts`:
+Add to `frontend/src/stores/__tests__/evaluatorStore.test.ts` (check the file's existing imports/setup first — it already imports `useEvaluatorStore` and sets up Pinia per existing tests; add a new top-level `describe` block at the end of the file):
 
 ```ts
-import { describe, it, expect } from 'vitest'
-import { calcularFlujosDeCaja } from '../financialEngine'
 
-const INPUTS_EXCEL = {
-  capex: 4_587_742_837,
-  kWp: 1320,
-  kVA: 1000,
-  produccionEspecifica: 4.5287,
-  arriendoAnual: 26_275_000,
-}
+describe('perProjectValues y perProjectResults', () => {
+  it('se autopobla desde terrainData.proyectos al buscar terreno', async () => {
+    const store = useEvaluatorStore()
+    vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue({
+      code: 'COLSANT5', name: 'Test', municipality: 'Giron', or: 'ESSA',
+      nivel_tension: '13.8kV', cluster: 2,
+      ocupacion_cauce: false, ocupacion_cauce_detalle: 'No Requiere',
+      servidumbre: 0, servidumbre_detalle: null,
+      coexistencias: false, coexistencias_detalle: [],
+      produccion_especifica: 4.5, arriendo_anual: 20_000_000,
+      proyectos: [
+        { nombre: 'P1', distancia_via: 10, distancia_red: 30, aprovechamiento_forestal: 'visita', numero_arboles: 2, tipo_estructura: 'tracker' },
+        { nombre: 'P2', distancia_via: 12, distancia_red: 28, aprovechamiento_forestal: null, numero_arboles: 0, tipo_estructura: 'mesa_fija' },
+      ],
+    })
+    await store.fetchTerrain('COLSANT5')
 
-describe('calcularFlujosDeCaja', () => {
-  it('el año 0 (inversión) es -capex en el flujo del inversionista', () => {
-    const { flujoInversionista } = calcularFlujosDeCaja(INPUTS_EXCEL)
-    expect(flujoInversionista[0]).toBeCloseTo(-4_587_742_837, 0)
+    expect(store.perProjectValues['numero_arboles']).toEqual({ P1: 2, P2: 0 })
+    expect(store.perProjectValues['distancia_via']).toEqual({ P1: 10, P2: 12 })
   })
 
-  it('genera 34 períodos (2026 a 2059)', () => {
-    const { flujoInversionista } = calcularFlujosDeCaja(INPUTS_EXCEL)
-    expect(flujoInversionista).toHaveLength(34)
+  it('setPilotesForProyecto actualiza solo el proyecto indicado', () => {
+    const store = useEvaluatorStore()
+    store.setPilotesForProyecto('P1', true)
+    store.setPilotesForProyecto('P2', false)
+    expect(store.perProjectValues['pilotes']).toEqual({ P1: true, P2: false })
   })
 
-  it('el flujo operativo del año 1 (2027) es positivo y del orden esperado', () => {
-    const { flujoInversionista } = calcularFlujosDeCaja(INPUTS_EXCEL)
-    // El Excel da flujo del inversionista año 2027 (D38) ≈ 561,776,560.8 (ver Supuestos!Q4)
-    expect(flujoInversionista[1]).toBeCloseTo(561_776_560.8, -3)
+  it('perProjectResults refleja la división terreno_dividido entre proyectos', async () => {
+    const store = useEvaluatorStore()
+    vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue({
+      code: 'COLSANT5', name: 'Test', municipality: 'Giron', or: 'ESSA',
+      nivel_tension: '13.8kV', cluster: 2,
+      ocupacion_cauce: false, ocupacion_cauce_detalle: 'No Requiere',
+      servidumbre: 0, servidumbre_detalle: null,
+      coexistencias: false, coexistencias_detalle: [],
+      produccion_especifica: 4.5, arriendo_anual: 20_000_000,
+      proyectos: [
+        { nombre: 'P1', distancia_via: 10, distancia_red: 30, aprovechamiento_forestal: null, numero_arboles: 0, tipo_estructura: 'tracker' },
+        { nombre: 'P2', distancia_via: 12, distancia_red: 28, aprovechamiento_forestal: null, numero_arboles: 0, tipo_estructura: 'mesa_fija' },
+      ],
+    })
+    await store.fetchTerrain('COLSANT5')
+    store.setCriterionValue('corte', 100)
+
+    const p1Corte = store.perProjectResults['P1'].find(r => r.id === 'corte')
+    expect(p1Corte?.sobrecosto).toBe((100 * 80_000) / 2)
+  })
+})
+
+describe('perProjectFinancials', () => {
+  it('divide capex, kWp, kVA y arriendo entre N proyectos para el VPN', async () => {
+    const store = useEvaluatorStore()
+    vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue({
+      code: 'COLSANT5', name: 'Test', municipality: 'Giron', or: 'ESSA',
+      nivel_tension: '13.8kV', cluster: 2,
+      ocupacion_cauce: false, ocupacion_cauce_detalle: 'No Requiere',
+      servidumbre: 0, servidumbre_detalle: null,
+      coexistencias: false, coexistencias_detalle: [],
+      produccion_especifica: 4.5, arriendo_anual: 20_000_000,
+      proyectos: [
+        { nombre: 'P1', distancia_via: 10, distancia_red: 30, aprovechamiento_forestal: null, numero_arboles: 0, tipo_estructura: 'tracker' },
+        { nombre: 'P2', distancia_via: 12, distancia_red: 28, aprovechamiento_forestal: null, numero_arboles: 0, tipo_estructura: 'mesa_fija' },
+      ],
+    })
+    await store.fetchTerrain('COLSANT5')
+
+    expect(store.perProjectFinancials).not.toBeNull()
+    expect(store.perProjectFinancials!['P1'].vpn).toBeCloseTo(store.financialResults!.vpn / 2, 0)
+    expect(store.perProjectFinancials!['P2'].vpn).toBeCloseTo(store.financialResults!.vpn / 2, 0)
   })
 })
 ```
 
-- [ ] **Step 2: Correr el test para verificar que falla**
+Check the top of `frontend/src/stores/__tests__/evaluatorStore.test.ts` for the exact existing import of `terrainService` (it should already be imported as `import * as terrainService from '@/services/terrainService'` or similar, since the file already spies on `terrainService.fetchTerrainData` per the codebase's existing test — reuse that same import, do not add a duplicate).
 
-```bash
-cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
-npx vitest run financialEngine
-```
+- [ ] **Step 2: Run tests to verify they fail**
 
-Expected: FAIL — `Cannot find module '../financialEngine'`.
+Run (from `frontend/`): `npx vitest run src/stores/__tests__/evaluatorStore.test.ts`
 
-- [ ] **Step 3: Implementar `financialEngine.ts` (ingresos + costos + CAPEX)**
+Expected: FAIL — `store.perProjectValues` is `undefined`, `setPilotesForProyecto` is not a function, `perProjectResults`/`perProjectFinancials` are undefined.
+
+- [ ] **Step 3: Update `frontend/src/stores/evaluatorStore.ts`**
+
+Find (line 1-11):
 
 ```ts
-import type { FinancialInputs } from '@/types'
-import { AÑO_BASE, IPC, FX, PPA_CON_INDEXACION, MANTENIMIENTO_TRACKER, REEMPLAZO_INVERSORES } from './financialData'
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import { fetchTerrainData } from '@/services/terrainService'
+import { loadCriteria, evaluateCriteria, aggregateCosts } from '@/engine/evaluatorEngine'
+import { calcularFinanzas } from '@/engine/financialEngine'
+import { useAuthStore } from '@/stores/authStore'
+import type { TerrainData, CriterionValue, AggregatedResult, FinancialResults } from '@/types'
 
-const N_PERIODOS = 34               // 2026 (inversión) a 2059
-const DURACION_OPERACION_ANIOS = 30 // activo mientras (año - (AÑO_BASE+1)) <= 30
-const EFICIENCIA_INICIAL = 0.992
-const FACTOR_DEGRADACION = 0.0035
-const OPERACION_PCT_INGRESOS = 0.038
-const CGM_POR_KWH = 6.0
-const REPRESENTACION_POR_KWH = 6.0
-const COSTOS_REGULATORIOS_POR_KWH = 13.0
-const SEGURO_PCT_CAPEX = 0.00185
-const CRECIMIENTO_SEGURO = 0.01
-const ICA = 0.006
-const IVA = 0.19
-const MANTENIMIENTO_POR_KVA = 54000.0
-const SERVICIOS_PUBLICOS_MENSUAL = 1_500_000.0
-const PRECIO_REC_USD_MWH = 1.5
+type CriterionValues = Record<string, CriterionValue>
 
-function activo(anio: number): number {
-  return anio - (AÑO_BASE + 1) <= DURACION_OPERACION_ANIOS ? 1 : 0
-}
+const BASE_CAPEX_DEFAULT = 4_000_000_000
+const KWP_DEFAULT = 1320
+```
 
-export function calcularFlujosDeCaja(inputs: FinancialInputs): {
-  flujoInversionista: number[]
-} {
-  const { capex, kWp, kVA, produccionEspecifica, arriendoAnual } = inputs
+Replace with:
 
-  const eficiencia: number[] = new Array(N_PERIODOS).fill(0)
-  const generacion: number[] = new Array(N_PERIODOS).fill(0)
-  const ingresos: number[] = new Array(N_PERIODOS).fill(0)
-  const arriendo: number[] = new Array(N_PERIODOS).fill(0)
-  const operacion: number[] = new Array(N_PERIODOS).fill(0)
-  const cgm: number[] = new Array(N_PERIODOS).fill(0)
-  const representacion: number[] = new Array(N_PERIODOS).fill(0)
-  const costosRegulatorios: number[] = new Array(N_PERIODOS).fill(0)
-  const seguro: number[] = new Array(N_PERIODOS).fill(0)
-  const ica: number[] = new Array(N_PERIODOS).fill(0)
-  const iva: number[] = new Array(N_PERIODOS).fill(0)
-  const mantenimiento: number[] = new Array(N_PERIODOS).fill(0)
-  const serviciosPublicos: number[] = new Array(N_PERIODOS).fill(0)
-  const flujoOperativo: number[] = new Array(N_PERIODOS).fill(0)
-  const flujoInversionista: number[] = new Array(N_PERIODOS).fill(0)
+```ts
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import { fetchTerrainData } from '@/services/terrainService'
+import { loadCriteria, evaluateScoped, aggregateCosts } from '@/engine/evaluatorEngine'
+import { calcularFinanzas } from '@/engine/financialEngine'
+import { useAuthStore } from '@/stores/authStore'
+import type { TerrainData, CriterionValue, CriterionResult, AggregatedResult, FinancialResults } from '@/types'
 
-  // CGM/Representación/Costos regulatorios se cobran como una tarifa COP/kWh que crece
-  // con IPC cada año (igual que el Excel: fila 14/15/16 recuperan la tarifa implícita del
-  // año anterior vía "costo_anterior/generación_anterior" y la crecen antes de multiplicar
-  // por la generación del año actual). Se trackean aparte para no perder precisión.
-  let tarifaCgm = CGM_POR_KWH
-  let tarifaRepresentacion = REPRESENTACION_POR_KWH
-  let tarifaCostosRegulatorios = COSTOS_REGULATORIOS_POR_KWH
+type CriterionValues = Record<string, CriterionValue>
+type PerProjectValues = Record<string, Record<string, CriterionValue>>
 
-  // Año 0 (2026): solo el desembolso de la inversión (Supuestos!D30).
-  flujoInversionista[0] = -capex
+const BASE_CAPEX_DEFAULT = 4_000_000_000
+const KWP_DEFAULT = 1320
+const PROYECTO_SCOPE_DB_FIELDS = ['distancia_via', 'distancia_red', 'aprovechamiento_forestal', 'numero_arboles', 'tipo_estructura']
+```
 
-  for (let k = 1; k < N_PERIODOS; k++) {
-    const anio = AÑO_BASE + k
-    const act = activo(anio)
+Note: `evaluateCriteria` (plain, non-scope-aware) stays exported from `evaluatorEngine.ts` and untouched — this store simply stops importing it, switching to `evaluateScoped` instead. Other existing tests that call `evaluateCriteria` directly keep working unchanged.
 
-    // Eficiencia y generación
-    eficiencia[k] = k === 1 ? EFICIENCIA_INICIAL : eficiencia[k - 1] - FACTOR_DEGRADACION
-    generacion[k] = eficiencia[k] * kWp * produccionEspecifica * 365 * act
+Find (lines 14-24):
 
-    // Ingresos: PPA usa el valor del AÑO ANTERIOR de la tabla macro (offset -1, ver spec)
-    const ppa = PPA_CON_INDEXACION[k - 1] ?? PPA_CON_INDEXACION[PPA_CON_INDEXACION.length - 1]
-    const ventaEnergia = ppa * generacion[k] * act
-    const fx = FX[k] ?? FX[FX.length - 1]
-    const precioRecCopPorMwh = PRECIO_REC_USD_MWH * fx
-    const rec = precioRecCopPorMwh * (generacion[k] / 1000) * act
-    ingresos[k] = ventaEnergia + rec
+```ts
+export const useEvaluatorStore = defineStore('evaluador', () => {
+  const terrainData = ref<TerrainData | null>(null)
+  const criterionValues = ref<CriterionValues>({})
+  const baseCapex = ref(BASE_CAPEX_DEFAULT)
+  const kWp = ref(KWP_DEFAULT)
+  const kVA = ref(1000)
+  const arriendoManual = ref<number | null>(null)
+  const loading = ref(false)
+  const error = ref<string | null>(null)
 
-    // Costos (todos negativos). Crecimiento por IPC: para pasar del año (k-1) al año k
-    // se usa IPC[k-1] (el IPC "del año k-1", que es la tasa que lo infla hacia el año k) —
-    // IPC[i] en financialData.ts está alineado por año calendario (índice 0 = 2026).
-    if (k === 1) {
-      arriendo[k] = -arriendoAnual
-    } else {
-      arriendo[k] = arriendo[k - 1] * (1 + IPC[k - 1]) * act
+  const context = computed(() => ({ baseCapex: baseCapex.value, kWp: kWp.value }))
+```
+
+Replace with:
+
+```ts
+export const useEvaluatorStore = defineStore('evaluador', () => {
+  const terrainData = ref<TerrainData | null>(null)
+  const criterionValues = ref<CriterionValues>({})
+  const perProjectValues = ref<PerProjectValues>({})
+  const baseCapex = ref(BASE_CAPEX_DEFAULT)
+  const kWp = ref(KWP_DEFAULT)
+  const kVA = ref(1000)
+  const arriendoManual = ref<number | null>(null)
+  const loading = ref(false)
+  const error = ref<string | null>(null)
+
+  const proyectoNombres = computed(() => terrainData.value?.proyectos.map(p => p.nombre) ?? [])
+  const projectCount = computed(() => Math.max(proyectoNombres.value.length, 1))
+
+  const context = computed(() => ({ baseCapex: baseCapex.value, kWp: kWp.value, projectCount: projectCount.value }))
+```
+
+Find (lines 26-29, the `aggregated` computed):
+
+```ts
+  const aggregated = computed<AggregatedResult>(() => {
+    const results = evaluateCriteria(criterionValues.value, context.value)
+    return aggregateCosts(results, context.value)
+  })
+```
+
+Replace with (both `aggregated` and the new `perProjectResults` are derived from the SAME `evaluateScoped` call, so the general total and the per-project breakdown can never drift apart from two independently-computed sources):
+
+```ts
+  const scopedEvaluation = computed(() => {
+    return evaluateScoped(criterionValues.value, perProjectValues.value, proyectoNombres.value, context.value)
+  })
+
+  const aggregated = computed<AggregatedResult>(() => {
+    return aggregateCosts(scopedEvaluation.value.general, context.value)
+  })
+
+  const perProjectResults = computed<Record<string, CriterionResult[]>>(() => {
+    return scopedEvaluation.value.porProyecto
+  })
+```
+
+Find (lines 31-42, the `financialResults` computed):
+
+```ts
+  const financialResults = computed<FinancialResults | null>(() => {
+    const produccionEspecifica = terrainData.value?.produccion_especifica
+    const arriendoAnual = arriendoManual.value ?? terrainData.value?.arriendo_anual
+    if (!produccionEspecifica || !arriendoAnual) return null
+    return calcularFinanzas({
+      capex: aggregated.value.capexTotal,
+      kWp: kWp.value,
+      kVA: kVA.value,
+      produccionEspecifica,
+      arriendoAnual,
+    })
+  })
+```
+
+Immediately after it, insert:
+
+```ts
+
+  const perProjectFinancials = computed<Record<string, { vpn: number; vpnConBeneficios: number }> | null>(() => {
+    const produccionEspecifica = terrainData.value?.produccion_especifica
+    const arriendoAnual = arriendoManual.value ?? terrainData.value?.arriendo_anual
+    if (!produccionEspecifica || !arriendoAnual) return null
+    const n = projectCount.value
+    // Divide el CAPEX GENERAL ya agregado (no reconstruir desde perProjectResults —
+    // eso ya divide los criterios terreno_dividido dentro de evaluateScoped; volver
+    // a dividir aquí dividiría dos veces esa porción, y baseCapex quedaría sin dividir).
+    const capexPorProyecto = aggregated.value.capexTotal / n
+
+    const resultado: Record<string, { vpn: number; vpnConBeneficios: number }> = {}
+    for (const nombre of proyectoNombres.value) {
+      const finanzas = calcularFinanzas({
+        capex: capexPorProyecto,
+        kWp: kWp.value / n,
+        kVA: kVA.value / n,
+        produccionEspecifica,
+        arriendoAnual: arriendoAnual / n,
+      })
+      resultado[nombre] = { vpn: finanzas.vpn, vpnConBeneficios: finanzas.vpnConBeneficios }
     }
-    operacion[k] = -ingresos[k] * OPERACION_PCT_INGRESOS * act
+    return resultado
+  })
+```
 
-    if (k > 1) {
-      tarifaCgm *= 1 + IPC[k - 1]
-      tarifaRepresentacion *= 1 + IPC[k - 1]
-      tarifaCostosRegulatorios *= 1 + IPC[k - 1]
+Find (lines 44-66, `fetchTerrain`):
+
+```ts
+  async function fetchTerrain(code: string): Promise<void> {
+    loading.value = true
+    error.value = null
+    try {
+      const auth = useAuthStore()
+      const data = await fetchTerrainData(code, auth.accessToken ?? '')
+      terrainData.value = data
+
+      const criteria = loadCriteria()
+      const dbValues: CriterionValues = {}
+      for (const criterion of criteria) {
+        if (criterion.dbField && data[criterion.dbField as keyof TerrainData] !== undefined) {
+          dbValues[criterion.id] = data[criterion.dbField as keyof TerrainData] as CriterionValue
+        }
+      }
+      criterionValues.value = { ...criterionValues.value, ...dbValues }
+    } catch (e) {
+      error.value = 'No se encontró el terreno o error de conexión.'
+      terrainData.value = null
+    } finally {
+      loading.value = false
     }
-    cgm[k] = -generacion[k] * tarifaCgm * act
-    representacion[k] = -generacion[k] * tarifaRepresentacion * act
-    costosRegulatorios[k] = -generacion[k] * tarifaCostosRegulatorios * act
-
-    if (k === 1) {
-      seguro[k] = -capex * SEGURO_PCT_CAPEX
-    } else {
-      seguro[k] = seguro[k - 1] * (1 + CRECIMIENTO_SEGURO) * act
-    }
-
-    ica[k] = -ventaEnergia * ICA
-
-    if (k === 1) {
-      mantenimiento[k] = -kVA * MANTENIMIENTO_POR_KVA
-    } else {
-      mantenimiento[k] = mantenimiento[k - 1] * (1 + IPC[k - 1]) * act
-    }
-
-    // IVA no deducible sobre operación (mitad), representación y mantenimiento
-    iva[k] = (operacion[k] / 2 + representacion[k] + mantenimiento[k]) * IVA
-
-    if (k === 1) {
-      serviciosPublicos[k] = -SERVICIOS_PUBLICOS_MENSUAL * 12
-    } else {
-      serviciosPublicos[k] = serviciosPublicos[k - 1] * (1 + IPC[k - 1]) * act
-    }
-
-    // Mantenimiento de tracker (cada 5 años) y reemplazo de inversores (una vez, año 16):
-    // montos fijos ya calculados con las tarifas y FX del Excel (ver financialData.ts).
-    const mantenimientoTracker = MANTENIMIENTO_TRACKER[k] ?? 0
-    const reemplazoInversores = REEMPLAZO_INVERSORES[k] ?? 0
-
-    flujoOperativo[k] =
-      ingresos[k] +
-      arriendo[k] + operacion[k] + cgm[k] + representacion[k] +
-      costosRegulatorios[k] + seguro[k] + ica[k] + iva[k] + mantenimiento[k] + serviciosPublicos[k] +
-      mantenimientoTracker + reemplazoInversores
-
-    flujoInversionista[k] = flujoOperativo[k] // participación = 1 en el Excel (D29)
   }
-
-  return { flujoInversionista }
-}
 ```
 
-- [ ] **Step 4: Correr el test — iterar hasta que pase**
+Replace with:
 
-```bash
-cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
-npx vitest run financialEngine
+```ts
+  async function fetchTerrain(code: string): Promise<void> {
+    loading.value = true
+    error.value = null
+    try {
+      const auth = useAuthStore()
+      const data = await fetchTerrainData(code, auth.accessToken ?? '')
+      terrainData.value = data
+
+      const criteria = loadCriteria()
+      const dbValues: CriterionValues = {}
+      for (const criterion of criteria) {
+        if (criterion.scope === 'proyecto') continue
+        if (criterion.dbField && data[criterion.dbField as keyof TerrainData] !== undefined) {
+          dbValues[criterion.id] = data[criterion.dbField as keyof TerrainData] as CriterionValue
+        }
+      }
+      criterionValues.value = { ...criterionValues.value, ...dbValues }
+
+      const newPerProjectValues: PerProjectValues = {}
+      for (const field of PROYECTO_SCOPE_DB_FIELDS) {
+        newPerProjectValues[field] = {}
+        for (const proyecto of data.proyectos) {
+          newPerProjectValues[field][proyecto.nombre] = proyecto[field as keyof typeof proyecto] as CriterionValue
+        }
+      }
+      perProjectValues.value = newPerProjectValues
+    } catch (e) {
+      error.value = 'No se encontró el terreno o error de conexión.'
+      terrainData.value = null
+    } finally {
+      loading.value = false
+    }
+  }
 ```
 
-Expected: los 3 tests deben pasar. Si `flujoInversionista[1]` no da el valor esperado dentro de tolerancia, revisa primero el offset de `PPA_CON_INDEXACION` y de `IPC` contra `docs/superpowers/specs/2026-07-03-motor-financiero-design.md` (sección "Cálculo año por año") — son los puntos más propensos a errores de índice.
+Find (lines 68-70, `setCriterionValue`):
 
-- [ ] **Step 5: Commit**
+```ts
+  function setCriterionValue(id: string, value: CriterionValue): void {
+    criterionValues.value = { ...criterionValues.value, [id]: value }
+  }
+```
+
+Immediately after it, insert:
+
+```ts
+
+  function setPilotesForProyecto(nombre: string, value: boolean): void {
+    perProjectValues.value = {
+      ...perProjectValues.value,
+      pilotes: { ...perProjectValues.value.pilotes, [nombre]: value },
+    }
+  }
+```
+
+Find (lines 72-76, `reset`):
+
+```ts
+  function reset(): void {
+    terrainData.value = null
+    criterionValues.value = {}
+    error.value = null
+  }
+```
+
+Replace with:
+
+```ts
+  function reset(): void {
+    terrainData.value = null
+    criterionValues.value = {}
+    perProjectValues.value = {}
+    error.value = null
+  }
+```
+
+Find (lines 78-81, the return statement):
+
+```ts
+  return {
+    terrainData, criterionValues, baseCapex, kWp, kVA, arriendoManual,
+    loading, error, aggregated, financialResults, fetchTerrain, setCriterionValue, reset,
+  }
+```
+
+Replace with:
+
+```ts
+  return {
+    terrainData, criterionValues, perProjectValues, baseCapex, kWp, kVA, arriendoManual,
+    loading, error, aggregated, financialResults, perProjectResults, perProjectFinancials,
+    proyectoNombres, fetchTerrain, setCriterionValue, setPilotesForProyecto, reset,
+  }
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run (from `frontend/`): `npx vitest run src/stores/__tests__/evaluatorStore.test.ts`
+
+Expected: PASS — all tests, including the new ones.
+
+- [ ] **Step 5: Fix `frontend/src/components/SummaryPanel.vue`'s itemized breakdown filters**
+
+`evaluateScoped` (Task 3) sets `value: null` for scope-`proyecto` criteria in the **general** result (there's no single representative value at the terrain level — only a summed `sobrecosto`, see Task 3's rationale). `SummaryPanel.vue`'s itemized lists currently require `r.value !== null` to show a line, which would silently hide distancia_via/distancia_red/numero_arboles/aprovechamiento_forestal/pilotes from the sidebar breakdown even though they now correctly contribute to the total shown below them. Since `sobrecosto !== 0` already excludes "nothing to show" criteria on its own, drop the redundant `value !== null` check.
+
+Find:
+
+```ts
+const fijoBreakdown = computed(() =>
+  store.aggregated.breakdown.filter(
+    r => (r.category === 'fijo' || r.category === 'ambas') && r.formulaDefined && r.value !== null && r.sobrecosto !== 0,
+  ),
+)
+
+const retrasoBreakdown = computed(() =>
+  store.aggregated.breakdown.filter(
+    r => r.category === 'probabilidad' && r.formulaDefined && r.value !== null && r.sobrecosto > 0,
+  ),
+)
+```
+
+Replace with:
+
+```ts
+const fijoBreakdown = computed(() =>
+  store.aggregated.breakdown.filter(
+    r => (r.category === 'fijo' || r.category === 'ambas') && r.formulaDefined && r.sobrecosto !== 0,
+  ),
+)
+
+const retrasoBreakdown = computed(() =>
+  store.aggregated.breakdown.filter(
+    r => r.category === 'probabilidad' && r.formulaDefined && r.sobrecosto > 0,
+  ),
+)
+```
+
+- [ ] **Step 6: Run the full suite and type-check**
+
+Run (from `frontend/`): `npx vitest run`
+
+Expected: all pass.
+
+Run (from `frontend/`): `npx vue-tsc -b`
+
+Expected: exactly the 2 pre-existing errors — any `TerrainData` field errors from earlier tasks should now be resolved by this task's rewrite of `fetchTerrain`, EXCEPT `CriterionCard.vue`'s references to the removed fields (`aprovechamiento_forestal_detalle`, `ocupacion_cauce_detalle` is still valid — only check for `distancia_via`/`numero_arboles`/`tipo_estructura`/`aprovechamiento_forestal` top-level reads), which Task 5 fixes. If `vue-tsc` shows errors in `CriterionCard.vue`, note them in your report as expected/deferred to Task 5 — do not fix `CriterionCard.vue` in this task.
+
+- [ ] **Step 7: Manual verification against the running dev server**
+
+This repo has no automated tests for `.vue` components — verify by code trace and, if a live browser is available, drive the app; otherwise state plainly in your report that this needs human verification.
+
+1. Restart backend + frontend dev servers if running.
+2. Search terrain `COLSANT5`.
+3. Confirm the sidebar "Resumen de costos" now shows line items for "Número de árboles" (and any other scope-`proyecto` criteria with a non-zero total) with the correct SUMMED value (e.g. `2 árboles` worth `2 * 142_500` + `0 árboles` worth `0` from the other project = `$285.000` total), where before this task it would have shown `$0` or been silently missing.
+
+- [ ] **Step 8: Commit**
 
 ```bash
-cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance"
-git add frontend/src/engine/financialEngine.ts frontend/src/engine/__tests__/financialEngine.test.ts
-git commit -m "feat: compute revenue, operating costs and CAPEX cash flows"
+git add frontend/src/stores/evaluatorStore.ts frontend/src/stores/__tests__/evaluatorStore.test.ts frontend/src/components/SummaryPanel.vue
+git commit -m "feat: add perProjectValues, perProjectResults, perProjectFinancials to evaluatorStore"
 ```
 
 ---

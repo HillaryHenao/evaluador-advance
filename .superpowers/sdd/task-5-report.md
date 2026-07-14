@@ -1,88 +1,58 @@
-# Task 5 Report: Beneficio tributario + resultados finales (TIR/VPN/Payback) + golden master
+# Task 5 Report: UI — CriterionCard.vue per-project rows for scope `proyecto`
 
-## What I implemented
+## What was implemented
 
-In `frontend/src/engine/financialEngine.ts` (appended after Task 4's `calcularFlujosDeCaja`, which was not modified):
+All 6 steps from the brief plus one necessary deviation:
 
-- Two new top-of-file imports: `import { irr, npv } from './financialMath'` and `FinancialResults` added to the existing `@/types` import.
-- `calcularBeneficioTributario(capex)`: builds a 34-element array of annual tax-benefit cash flows from (a) straight-line depreciation of 100% of capex over 15 years (years base+1..base+15) and (b) accelerated depreciation of an additional 50% of capex over 15 years, delayed by one year (years base+2..base+16, guarded by `k >= 2`), both taxed at 35%.
-- `calcularPayback(flujos)`: replicates the Excel's fractional-year payback convention — the investment year always contributes 1 full year, subsequent years contribute 1 while the investment remains unrecovered, a fraction in the crossing year, 0 after.
-- `calcularFinanzas(inputs)`: orchestrates `calcularFlujosDeCaja`, adds the tax benefit to get the "con beneficios" cash flow series, computes VPN as `flujo[0] + npv(10%, flujo.slice(1,32))` for both series, computes TIR via `irr()` for both series, computes payback for both series, and returns the `FinancialResults` shape.
+1. **Removed** the `aprovechamientoDetalle` computed (referenced deleted `TerrainData.aprovechamiento_forestal_detalle`) and its corresponding `<!-- Aprovechamiento forestal: detalle por proyecto -->` template block.
+2. **Fixed `accentColor`**: added a branch for `module.value?.scope === 'proyecto'` that checks `store.perProjectResults` across all projects instead of `props.result.value !== null` (which is always `null` for these 6 criteria per `evaluateScoped`'s design).
+3. **Added computeds/handler**: `isProyectoScope`, `proyectoRows` (per-project `{ nombre, value, sobrecosto }` derived from `store.perProjectResults`), `proyectoTotal` (sum of sobrecostos), and `handlePilotesToggle` (calls `store.setPilotesForProyecto`).
+4. **Added two new template branches**: one rendering a value+sobrecosto row per project (used by distancia_via, distancia_red, aprovechamiento_forestal, numero_arboles, tipo_estructura) plus a "Total" row, and one rendering a checkbox per project specifically for `pilotes`.
+5. **Hid the generic bottom `card-cost` row** for scope-`proyecto` criteria by adding `&& !isProyectoScope` to its `v-if`.
+6. **Added CSS** for `.proyecto-rows`/`.proyecto-row`/`.proyecto-row-nombre`/`.proyecto-row-valor`/`.proyecto-row-sobrecosto`/`.proyecto-row--total`, exactly as specified.
 
-In `frontend/src/engine/__tests__/financialEngine.test.ts`: added the golden-master `describe` block exactly as specified in the brief, plus updated the import line to bring in `calcularFinanzas`.
+### Deviation from the brief (necessary fix, not optional)
 
-## TDD Evidence
+The brief's Step 4 places the new `v-else-if="isProyectoScope && ..."` branches **after** the existing `number`/`toggle`/`select`/`checklist` branches in the `v-if`/`v-else-if` chain. I verified against the actual criteria modules (`frontend/src/criteria/distancia_via.ts`, `distancia_red.ts`, `numero_arboles.ts` → `inputType: 'number'`; `pilotes.ts` → `inputType: 'toggle'`; `tipo_estructura.ts`, `aprovechamiento_forestal.ts` → `inputType: 'select'`) that all 6 scope-`proyecto` criteria use `inputType` values that are also matched by the earlier branches. Left as literally specified, those earlier branches would always win, making the new proyecto-scope branches **unreachable** — the generic single-input/single-toggle/single-select UI would keep rendering instead, which is precisely the bug this task exists to fix.
 
-### RED
+I fixed this by adding `&& !isProyectoScope` to the three existing branch conditions:
+- `v-if="module?.inputType === 'number' && !isProyectoScope"`
+- `v-else-if="module?.inputType === 'toggle' && !isProyectoScope"`
+- `v-else-if="module?.inputType === 'select' && !isProyectoScope"`
 
-Command:
-```
-cd frontend && npx vitest run financialEngine
-```
-Output (relevant excerpt):
-```
-FAIL  src/engine/__tests__/financialEngine.test.ts [ src/engine/__tests__/financialEngine.test.ts ]
-TypeError: calcularFinanzas is not a function
- ❯ src/engine/__tests__/financialEngine.test.ts:31:21
-Test Files  1 failed (1)
-Tests  no tests
-```
-Failed for the expected reason (function not yet implemented).
+(The `checklist` branch needed no change — `obras_hidraulicas` is the only checklist-type criterion and its scope is `terreno_dividido`, not `proyecto`, so no conflict exists there.)
 
-### GREEN
+## Verification approach and outcome
 
-Command:
-```
-cd frontend && npx vitest run financialEngine
-```
-Output:
-```
-Test Files  1 passed (1)
-     Tests  7 passed (7)
-```
+**Type-check (Step 7):** `npx vue-tsc -b` — the combined build only surfaces the pre-existing `vite.config.ts` error (Vitest `test` config key not recognized by `UserConfigExport`). Running `npx vue-tsc -b tsconfig.app.json --force` (the project that actually contains `CriterionCard.vue`) in isolation returns **zero errors**. Note: the brief expected "2 pre-existing errors" (also citing an `evaluatorEngine.test.ts` `ts-expect-error`), but no `ts-expect-error` comment exists anywhere in the current codebase (grep came up empty) — that second pre-existing error appears to have already been resolved by an earlier task (3 or 4). This is not a regression from this task; the only requirement that matters — no new `CriterionCard.vue` errors — holds.
 
-Actual computed values (captured via a temporary probe test, then removed) vs golden-master expectations:
-
-| Metric | Actual | Expected (golden master) | Match |
-|---|---|---|---|
-| tir | 0.11008828321041396 | 0.1100882832 | matches to ~9 decimal places |
-| tirConBeneficios | 0.14204359547095805 | 0.1420435955 | matches to ~9 decimal places |
-| vpn | 391,839,623.55481434 | 391,839,623.5 | matches to the cent |
-| vpnConBeneficios | 1,576,145,841.2955685 | 1,576,145,841 | matches to the cent |
-| paybackAnios | 9.550680027895089 | ~9 years (Excel) | within ~0.55 years — expected approximation |
-| paybackConBeneficiosAnios | 7.685372316478172 | ~7 years (Excel) | within ~0.69 years — expected approximation |
-
-TIR/VPN precision is essentially exact (better than the brief's own claim of 6 decimal places), confirming both the Task 4 cash flows and this task's formulas were transcribed correctly.
-
-### Full suite
-
-Command:
-```
-cd frontend && npx vitest run
-```
-Output:
-```
-Test Files  6 passed (6)
-     Tests  63 passed (63)
-```
-
-Also ran `npx vue-tsc --noEmit` — no type errors.
+**Manual verification (Step 8):**
+- Frontend dev server: confirmed reachable at `http://localhost:5173` (HTTP 200).
+- Backend dev server: was not running at `127.0.0.1:5000` initially; I started it (`python run.py` from `backend/`, Flask, debug mode) and confirmed `curl http://127.0.0.1:5000/api/terrain/COLSANT5` returns the expected shape:
+  - `proyectos: [{ nombre: "COLSANT5P1_GIRON_SUR", numero_arboles: 2, distancia_via: 10.0, distancia_red: 70.0, aprovechamiento_forestal: "visita", tipo_estructura: "tracker" }, { nombre: "COLSANT5P2_GIRON_SUR", numero_arboles: 0, distancia_via: 10.0, distancia_red: 30.0, aprovechamiento_forestal: null, tipo_estructura: "tracker" }]` — matches the brief's expected "P1: 2 árboles, P2: 0 árboles" check exactly.
+  - I stopped the backend process again afterward since it wasn't running when I started.
+- **No browser-automation tool is available to me** (confirmed — none in my toolset), so I could not visually drive the app or take a screenshot. I instead did a full code trace against the real API response and the store's data flow:
+  - `store.proyectoNombres` = `['COLSANT5P1_GIRON_SUR', 'COLSANT5P2_GIRON_SUR']` (from `terrainData.proyectos.map(p => p.nombre)`).
+  - `store.perProjectValues` populated per-field-per-project from the 5 DB fields (`fetchTerrain`'s `PROYECTO_SCOPE_DB_FIELDS` loop); `pilotes` is absent from that list (by design — manual boolean, not DB-sourced) so `store.perProjectValues.pilotes?.[nombre]` safely resolves to `undefined` (unchecked) until toggled.
+  - `store.perProjectResults` = `evaluateScoped(...).porProyecto`, keyed by project `nombre` → `CriterionResult[]`, matching exactly what `proyectoRows`/`accentColor` index into.
+  - Traced `numero_arboles` end-to-end: P1 value=2 → `computeCost` = 2 × 142,500 = 285,000; P2 value=0 → 0. `proyectoRows` would render "COLSANT5P1_GIRON_SUR — 2 árboles — $285.000" and "COLSANT5P2_GIRON_SUR — 0 árboles — —" (`formatCOP` renders 0 as "—"), plus a Total row of $285.000. This matches the brief's expected manual-check outcome.
+  - Confirmed a subtlety documented in the plan itself (`docs/superpowers/plans/2026-07-11-desglose-por-proyecto.md`, near the "Stop duplicating criteria evaluation" Task 6 step): `EvaluadorView.vue` still computes its `results` array via the old, non-scope-aware `evaluateCriteria(store.criterionValues, ...)` (fixing that is explicitly Task 6's job, not Task 5's). This means the `result` prop `CriterionCard` receives for the 6 scope-`proyecto` criteria always has `value: null, sobrecosto: 0` — but this is harmless *because* my new `isProyectoScope` branches and `accentColor` fix deliberately bypass `props.result` and read fresh data from `store.perProjectResults` directly. The plan explicitly calls this out as the intended (if "fragile") state for this task, confirming my implementation matches the documented design intent.
+  - **Human/browser verification is still needed** to visually confirm rendered layout, spacing, and interactive behavior (checkbox toggling triggering re-computation) in an actual browser — I could not perform this myself.
 
 ## Files changed
 
-- `frontend/src/engine/financialEngine.ts` — added imports, `calcularBeneficioTributario`, `calcularPayback`, `calcularFinanzas` (87 lines added, Task 4 code untouched).
-- `frontend/src/engine/__tests__/financialEngine.test.ts` — added `calcularFinanzas` import and the golden-master `describe` block.
-
-Commit: `775d2ad` — "feat: add tax benefit calculation and TIR/VPN/Payback outputs"
+- `C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend\src\components\CriterionCard.vue`
 
 ## Self-review findings
 
-- Both new imports are at the top of the file, not mid-file: `import { irr, npv } from './financialMath'` and `FinancialResults` merged into the existing `import type { FinancialInputs, FinancialResults } from '@/types'` line.
-- `calcularBeneficioTributario` correctly implements both straight-line depreciation (years base+1..base+15) and the accelerated 50%-of-capex depreciation delayed by one year with the `k >= 2` guard, exactly as specified in the brief.
-- The VPN calculation slices `flujoInversionista.slice(1, 32)` (31 elements, years 1-31) and separately adds `flujoInversionista[0]`, matching the brief's Excel-replication note.
-- The payback function and its approximate-precision caveat were transcribed as-is from the brief; no constant was fudged to force closer agreement with the Excel's 9/7-year figures.
-- Diff was reviewed line-by-line against the brief's code blocks before committing — matches verbatim.
+- `accentColor` correctly falls back to the original `props.result.value !== null` check for all non-proyecto-scope criteria (the new branch is gated behind `module.value?.scope === 'proyecto'` and returns unconditionally, only for those 6 criteria). Verified: no other criterion has `scope: 'proyecto'` besides the 6 (checked all 17 files in `frontend/src/criteria/`).
+- `pilotes` renders checkboxes (one per project name), not the generic value/sobrecosto row — confirmed via the `result.id === 'pilotes'` branch guard, reachable now thanks to the added `!isProyectoScope` guard on the `toggle` branch.
+- The other 5 proyecto-scope criteria (distancia_via, distancia_red, aprovechamiento_forestal, numero_arboles, tipo_estructura) render the value+sobrecosto+Total row template — confirmed each of their `inputType`s (`number`, `number`, `select`, `number`, `select`) is now excluded from the generic branches via `!isProyectoScope`, falling through to the new `result.id !== 'pilotes'` branch.
+- The bottom `card-cost` generic COP row is hidden only for scope-`proyecto` criteria; the other 12 criteria's `v-if` condition (`result.formulaDefined && result.category !== 'probabilidad'`) is otherwise unchanged, so their existing bottom cost row displays exactly as before.
+- No leftover references to `aprovechamiento_forestal_detalle` or any `ProyectoEstadoDetalle` type anywhere in the file (grep confirmed empty).
 
 ## Concerns
 
-None blocking. The only known imprecision is the payback calculation, which is explicitly documented in the brief as an accepted approximation (fractional-year convention couldn't be fully reverse-engineered from the Excel). Actual results: 9.55 years (no benefits) vs Excel's ~9, and 7.69 years (with benefits) vs Excel's ~7 — both within less than a year, which is in line with the brief's expectation and is not something to chase further at the expense of TIR/VPN accuracy (which is near-exact).
+- **Deviation flagged above**: the brief's literal Step 4 ordering would have silently made the new per-project UI unreachable for all 6 criteria (each of their `inputType`s collides with an earlier generic branch). This was necessary to fix for the feature to function at all; documented in detail above for reviewer awareness.
+- Manual browser verification (visual layout, live toggle interaction) was not performed — no browser-automation tool was available to me. Code trace against the live backend response is as far as I could verify independently.
+- `EvaluadorView.vue` still uses the old `evaluateCriteria` path for the generic `result` prop (Task 6's responsibility per the plan) — flagged only for continuity; not a defect in this task's scope, and explicitly anticipated by the plan document itself.

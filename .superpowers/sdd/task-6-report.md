@@ -1,82 +1,98 @@
-# Task 6 Report: Wire en `evaluatorStore` (kVA, arriendo/producción reactivos, financialResults)
+# Task 6 Report: UI — "Desglose por proyecto" section
 
 ## What I implemented
 
-- Added `kVA = ref(1000)` and `arriendoManual = ref<number | null>(null)` alongside the existing `kWp` declaration in `evaluatorStore.ts`.
-- Added a `financialResults` computed (placed next to the existing `aggregated` computed) that:
-  - reads `produccion_especifica` from `terrainData`
-  - resolves `arriendoAnual` as `arriendoManual.value ?? terrainData.value?.arriendo_anual` (manual override wins over DB value)
-  - returns `null` if either `produccionEspecifica` or `arriendoAnual` is falsy
-  - otherwise calls `calcularFinanzas({ capex: aggregated.value.capexTotal, kWp, kVA, produccionEspecifica, arriendoAnual })`
-- Updated the store's `return` statement to include `kVA`, `arriendoManual`, and `financialResults` alongside all previously returned members (nothing removed).
-- Added imports: `calcularFinanzas` from `@/engine/financialEngine`, and the `FinancialResults` type from `@/types`.
-- Added the two tests specified in the brief to `frontend/src/stores/__tests__/evaluatorStore.test.ts` (new `describe('financialResults', ...)` block).
+1. Created `frontend/src/components/ProjectBreakdownPanel.vue` exactly per the brief: a
+   `<script setup>` computed `proyectos` that maps `store.proyectoNombres` to per-project
+   `{ nombre, costosFijos, riesgoMonto, vpn, vpnConBeneficios }` by calling `aggregateCosts`
+   on `store.perProjectResults[nombre]` with `{ baseCapex: store.baseCapex, kWp: store.kWp,
+   projectCount: Math.max(store.proyectoNombres.length, 1) }`, plus the template/style
+   exactly as given (cards grid, TIR/Payback note pulled once from `store.financialResults`).
 
-## TDD Evidence
+2. Modified `frontend/src/views/EvaluadorView.vue`:
+   - Removed `import { evaluateCriteria } from '@/engine/evaluatorEngine'`.
+   - Added `import ProjectBreakdownPanel from '@/components/ProjectBreakdownPanel.vue'`.
+   - Replaced `const results = computed(() => evaluateCriteria(store.criterionValues, { baseCapex: store.baseCapex, kWp: store.kWp }))`
+     with `const results = computed(() => store.aggregated.breakdown)`.
+   - Mounted `<ProjectBreakdownPanel />` right after the closing `</section>` of "Factores de
+     riesgo" and before the closing `</div>` of `.criteria-content`.
 
-### RED
+## Verification approach and outcome
 
-Command:
-```
-cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
-npx vitest run evaluatorStore
-```
+- **Anchor check**: read the actual current `EvaluadorView.vue` before editing — it matched
+  the brief's "Find" blocks character-for-character (imports, `results` computed, and the
+  template region around "Factores de riesgo"). No divergence, no escalation needed.
 
-Output (excerpt):
-```
- FAIL  src/stores/__tests__/evaluatorStore.test.ts > financialResults > es null si no hay producción específica ni arriendo cargados
-AssertionError: expected undefined to be null
+- **Data-shape trace**: read `evaluatorStore.ts` and `evaluatorEngine.ts` to confirm
+  `store.aggregated` is `AggregatedResult` from `aggregateCosts(scopedEvaluation.value.general,
+  context.value)`, whose `.breakdown` field is literally the `results: CriterionResult[]`
+  argument passed in (i.e. the same array shape `evaluateCriteria` used to return). This
+  confirms `fijoResults`/`probabilidadResults` (which just `.filter()` by `category`) keep
+  working unchanged against the new source — no shape break. Also confirmed
+  `store.perProjectResults`, `store.perProjectFinancials`, `store.proyectoNombres`,
+  `store.financialResults`, and `aggregateCosts` all exist with the exact fields/signature
+  the new component calls (`totalSobrecostoFijo`, `totalRetraso`, `totalRiesgoCosto`, `vpn`,
+  `vpnConBeneficios`, `tir`, `paybackAnios`).
 
- FAIL  src/stores/__tests__/evaluatorStore.test.ts > financialResults > calcula TIR una vez cargados terrainData y kVA por defecto
-TypeError: actual value must be number or bigint, received "undefined"
+- **Type-check**: `npx vue-tsc -b` from `frontend/` -> exactly 1 error, in `vite.config.ts`
+  (`'test' does not exist in type 'UserConfigExport'`), unrelated to this task. No errors in
+  `ProjectBreakdownPanel.vue` or `EvaluadorView.vue`. (The brief said "2 pre-existing errors"
+  but flagged the real baseline was likely just this 1 — confirmed: only 1.)
 
- Test Files  1 failed (1)
-      Tests  2 failed | 3 passed (5)
-```
+- **Full test suite**: `npx vitest run` -> 1 file failed (`authStore.test.ts`, 2 tests:
+  `isAuthenticated` expected `false` got `true` in both "inicia sin usuario autenticado" and
+  "logout limpia el store y localStorage"), 83 passed. Confirmed **pre-existing and unrelated**
+  by stashing my `EvaluadorView.vue` change and re-running just that test file — identical
+  failure with my change absent. `authStore.ts` itself has zero diff vs. HEAD in this session,
+  so this is a baseline issue outside Task 6's scope, not a regression I introduced.
 
-Failed for the expected reason: `store.financialResults` was `undefined` (property did not exist yet), not `null`.
-
-### GREEN
-
-Command:
-```
-cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
-npx vitest run evaluatorStore
-```
-
-Output:
-```
- Test Files  1 passed (1)
-      Tests  5 passed (5)
-```
-
-Full suite:
-```
-cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
-npx vitest run
-```
-```
- Test Files  6 passed (6)
-      Tests  65 passed (65)
-```
+- **Manual/live verification**: started the backend (`python backend/run.py`) and called
+  `curl http://127.0.0.1:5000/api/terrain/COLSANT5` — got a real 200 response with a
+  `proyectos` array of 2 entries (`COLSANT5P1_GIRON_SUR`, `COLSANT5P2_GIRON_SUR`), each
+  carrying `distancia_red`, `distancia_via`, `aprovechamiento_forestal`, `numero_arboles`,
+  `tipo_estructura` — matching `PROYECTO_SCOPE_DB_FIELDS` in the store exactly. Top-level
+  `produccion_especifica` and `arriendo_anual` are both present and non-null, so
+  `store.financialResults` and `store.perProjectFinancials` will both be non-null for this
+  terrain — meaning the panel's TIR/Payback note and VPN/VPN-con-beneficios rows will all
+  render for a real search of `COLSANT5`. Stopped the backend afterward.
+  `curl -o /dev/null -w "%{http_code}" http://localhost:5173` -> `200`, confirming the Vite
+  dev server is up and serving the SPA shell.
+  **I have no browser-automation tool available in this environment**, so I could not visually
+  confirm the rendered "Desglose por proyecto" cards, their layout, or that the sum of both
+  projects' "Costos fijos" is within rounding of the sidebar's general total. **Human
+  visual verification in a browser at http://localhost:5173 (search `COLSANT5`) is still
+  needed** to close that last gap.
 
 ## Files changed
 
-- `frontend/src/stores/evaluatorStore.ts` — added `kVA`, `arriendoManual` refs, `financialResults` computed, updated imports and `return`.
-- `frontend/src/stores/__tests__/evaluatorStore.test.ts` — added `financialResults` describe block with the two tests from the brief.
-
-Commit: `7e2822a` — "feat: wire financial engine into evaluatorStore reactively" (2 files changed, 34 insertions, 3 deletions), on branch `feature/motor-financiero`.
-
-Note: the working tree also had pre-existing unrelated modifications (line-ending/CRLF normalization) to several `.superpowers/sdd/*.md` files and `progress.md`. These were NOT touched or committed by me — I staged only the two files listed above, matching the brief's `git add` instruction.
+- `frontend/src/components/ProjectBreakdownPanel.vue` (new)
+- `frontend/src/views/EvaluadorView.vue` (modified: import swap, `results` computed swap,
+  panel mounted after "Factores de riesgo")
 
 ## Self-review findings
 
-- `kVA` defaults to `1000`: confirmed (line 19).
-- `arriendoManual` defaults to `null`: confirmed (line 20).
-- `financialResults` returns `null` when `produccion_especifica` or the manual-or-DB arriendo is missing: confirmed (line 34 guard).
-- `financialResults` returns a real `FinancialResults` object otherwise: confirmed (calls `calcularFinanzas` with correct field mapping).
-- `return` statement includes `kVA`, `arriendoManual`, `financialResults` alongside all previously existing returned members, nothing removed: confirmed (lines 78-81).
+- `ProjectBreakdownPanel.vue` matches the brief's code exactly (computed logic for
+  `costosFijos`/`riesgoMonto`/`vpn`/`vpnConBeneficios`, template, and styles) — no deviation.
+- `EvaluadorView.vue` no longer imports or calls `evaluateCriteria` anywhere — verified via
+  the final file read; only `store.aggregated.breakdown` remains as the source for `results`.
+- `fijoResults`/`probabilidadResults` still operate correctly against the new `results.value`
+  shape (`CriterionResult[]`, same as before) — traced via `aggregateCosts`'s `breakdown:
+  results` passthrough in `evaluatorEngine.ts`.
+- `<ProjectBreakdownPanel />` is mounted in the correct place: immediately after the
+  "Factores de riesgo" `<section>`'s closing tag, still inside `.criteria-content`, before
+  `</div></main>`.
+- Git diff only touched the 2 intended files; commit `f164d16` contains exactly those 2
+  files (142 insertions, 5 deletions, 1 new file) — no accidental changes to other project
+  files.
 
 ## Concerns
 
-- The brief's "Interfaces" section (line 9) names the produced ref as `evaluatorStore.arriendoAnual`, but the Step 4 code (and the task prompt from the orchestrator) both specify `arriendoManual`. I followed the exact code in Step 4 / the prompt (`arriendoManual`), since that's what's consumed by the tests and is explicitly called out as authoritative. Task 7 (UI wiring) should use `arriendoManual`, not `arriendoAnual`, when it lands.
+- The pre-existing `authStore.test.ts` failures (2 tests) are a real, unrelated bug in the
+  repo's auth store / test isolation (confirmed pre-existing, not caused by this task) —
+  flagging it since it's outside this task's scope to fix but is a live regression risk if
+  left unaddressed.
+- No browser was available to visually confirm the rendered UI (card layout, "igual para
+  todos los proyectos" note placement, rounding-consistency between the panel's per-project
+  Costos-fijos sum and the sidebar's general total) — code trace is solid but human/browser
+  verification of the actual pixels is still outstanding, as flagged in the task's own
+  caveat.

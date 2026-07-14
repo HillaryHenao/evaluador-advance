@@ -1,193 +1,626 @@
-### Task 1: `obras_hidraulicas` types + criterion module + unit tests
+### Task 1: Backend — `proyectos[]` per-project data (scope `proyecto`)
 
 **Files:**
-- Modify: `frontend/src/types/index.ts:1` (widen `CriterionValue`, add new interfaces), `frontend/src/types/index.ts:41-53` (extend `CriterionModule`)
-- Modify: `frontend/src/criteria/obras_hidraulicas.ts` (full rewrite)
-- Modify: `frontend/src/criteria/__tests__/criteria.test.ts` (add tests, add import)
+- Modify: `backend/app/services/terrain_service.py` (full rewrite of `get_terrain_data` and its helpers)
+- Modify: `backend/tests/test_terrain.py:25-44` (update mock shape)
+- Modify: `backend/tests/test_terrain_service.py` (replace the 3 `numero_arboles`-summing tests with per-project tests)
 
 **Interfaces:**
-- Produces (used by Task 2): `ObraHidraulicaItem { activo: boolean; cantidad: number | null }`, `ObrasHidraulicasValue { canal_concreto: ObraHidraulicaItem; cuneta_via: ObraHidraulicaItem; box_culvert: ObraHidraulicaItem; alcantarilla_cruce: ObraHidraulicaItem }`, `ChecklistItemDef { key: string; label: string; unit: string; group: 'metro' | 'fijo'; groupLabel: string; tarifa: number }`, all exported from `@/types`.
-- Produces (used by Task 2): `CriterionModule.checklistItems?: ChecklistItemDef[]` — populated on the `obras_hidraulicas` module with the 4 item definitions, in this exact order: `canal_concreto`, `cuneta_via`, `box_culvert`, `alcantarilla_cruce`.
+- Produces (used by Task 2): `_get_active_project_ids(terrain_id: int) -> list[int]` — the shared "which projects count" helper.
+- Produces (used by Task 2, Task 3): the API response gains `proyectos: list[dict]`, each `{nombre: str, distancia_via: float|None, distancia_red: float|None, tipo_estructura: str|None, numero_arboles: int|None, aprovechamiento_forestal: str|None}`. The response loses top-level `distancia_via`, `distancia_red`, `tipo_estructura`, `numero_arboles`, `aprovechamiento_forestal`, `aprovechamiento_forestal_detalle`.
 
-- [ ] **Step 1: Update `frontend/src/types/index.ts` — widen `CriterionValue` and add new interfaces**
+- [ ] **Step 1: Write the failing tests**
 
-Replace line 1 (`export type CriterionValue = number | boolean | string | null`) with:
+Replace the full content of `backend/tests/test_terrain_service.py` with:
 
-```ts
-export interface ObraHidraulicaItem {
-  activo: boolean
-  cantidad: number | null
-}
+```python
+from unittest.mock import patch, MagicMock
 
-export interface ObrasHidraulicasValue {
-  canal_concreto: ObraHidraulicaItem
-  cuneta_via: ObraHidraulicaItem
-  box_culvert: ObraHidraulicaItem
-  alcantarilla_cruce: ObraHidraulicaItem
-}
+from app.services import terrain_service
 
-export type CriterionValue = number | boolean | string | null | ObrasHidraulicasValue
+
+def _mock_conn(rows):
+    cur = MagicMock()
+    cur.fetchall.return_value = rows
+    cur.fetchone.return_value = rows[0] if rows else None
+    cur.__enter__.return_value = cur
+    cur.__exit__.return_value = False
+    conn = MagicMock()
+    conn.cursor.return_value = cur
+    return conn
+
+
+def test_resolve_aprovechamiento_nivel_visita():
+    assert terrain_service._resolve_aprovechamiento_nivel('Visita') == 'visita'
+
+
+def test_resolve_aprovechamiento_nivel_radicada():
+    assert terrain_service._resolve_aprovechamiento_nivel('Solicitud radicada') == 'radicada'
+
+
+def test_resolve_aprovechamiento_nivel_otro():
+    assert terrain_service._resolve_aprovechamiento_nivel('Pausado') == 'otro'
+
+
+def test_resolve_aprovechamiento_nivel_resuelto():
+    assert terrain_service._resolve_aprovechamiento_nivel('Exonerado') is None
+    assert terrain_service._resolve_aprovechamiento_nivel('Solicitud aprobada') is None
+
+
+def test_resolve_aprovechamiento_nivel_vacio():
+    assert terrain_service._resolve_aprovechamiento_nivel('') is None
+
+
+def test_get_proyectos_activos_devuelve_datos_por_proyecto():
+    # COLSANT5: P1 en visita con 2 árboles, P2 exonerado con 0 árboles — cada uno con su
+    # propio dato, sin funnel a un valor compartido del terreno.
+    rows = [
+        {
+            'nombre': 'COLSANT5P1_GIRON_SUR',
+            'distancia_via': 10.0, 'distancia_red': 30.0,
+            'tipo_raw': '1P TRACKER', 'numero_arboles_raw': '2',
+            'aprov_value': 'Visita', 'aprov_status': 'pending',
+        },
+        {
+            'nombre': 'COLSANT5P2_GIRON_SUR',
+            'distancia_via': 12.0, 'distancia_red': 28.0,
+            'tipo_raw': 'MESA FIJA', 'numero_arboles_raw': '0',
+            'aprov_value': None, 'aprov_status': 'exonerated',
+        },
+    ]
+    with patch.object(terrain_service, '_connect', return_value=_mock_conn(rows)):
+        proyectos = terrain_service._get_proyectos_activos(287)
+
+    assert proyectos == [
+        {
+            'nombre': 'COLSANT5P1_GIRON_SUR', 'distancia_via': 10.0, 'distancia_red': 30.0,
+            'tipo_estructura': 'tracker', 'numero_arboles': 2, 'aprovechamiento_forestal': 'visita',
+        },
+        {
+            'nombre': 'COLSANT5P2_GIRON_SUR', 'distancia_via': 12.0, 'distancia_red': 28.0,
+            'tipo_estructura': 'mesa_fija', 'numero_arboles': 0, 'aprovechamiento_forestal': None,
+        },
+    ]
+
+
+def test_get_proyectos_activos_sin_proyectos():
+    with patch.object(terrain_service, '_connect', return_value=_mock_conn([])):
+        assert terrain_service._get_proyectos_activos(287) == []
+
+
+def test_get_active_project_ids():
+    rows = [{'id': 64}, {'id': 2606}]
+    with patch.object(terrain_service, '_connect', return_value=_mock_conn(rows)):
+        assert terrain_service._get_active_project_ids(287) == [64, 2606]
 ```
 
-- [ ] **Step 2: Update `CriterionModule` interface — add `ChecklistItemDef` and `checklistItems`**
+- [ ] **Step 2: Run tests to verify they fail**
 
-Find this block (currently lines 41-53):
+Run (from `backend/`): `./venv/Scripts/python.exe -m pytest tests/test_terrain_service.py -v`
 
-```ts
-export interface CriterionModule {
-  id: string
-  label: string
-  inputType: 'number' | 'toggle' | 'select'
-  unit?: string
-  dataSource: 'manual' | 'db' | 'db_or_manual'
-  dbField?: string
-  options?: SelectOption[]
-  formulaDefined: boolean
-  category: CriterionCategory
-  riskType?: RiskType
-  computeCost: (value: CriterionValue, context: EvalContext) => number
+Expected: FAIL with `AttributeError: module 'app.services.terrain_service' has no attribute '_resolve_aprovechamiento_nivel'` (and similarly for `_get_proyectos_activos`, `_get_active_project_ids`) — these functions don't exist yet.
+
+- [ ] **Step 3: Replace `backend/app/services/terrain_service.py` with this full content**
+
+```python
+import os
+from typing import Optional
+import psycopg2
+import psycopg2.extras
+
+
+def _connect(url: str):
+    return psycopg2.connect(url, cursor_factory=psycopg2.extras.RealDictCursor)
+
+
+def _get_active_project_ids(terrain_id: int) -> list[int]:
+    """IDs de los proyectos activos del terreno (mismo filtro que 'cluster'): excluye
+    dead/paused/uci."""
+    conn = _connect(os.environ['DATABASE_URL'])
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT id FROM minifarm_project
+                   WHERE terrain_id = %s AND stage NOT IN ('dead', 'paused', 'uci')
+                   ORDER BY id""",
+                (terrain_id,),
+            )
+            return [r['id'] for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+def _get_nivel_tension_terreno(project_ids: list[int]) -> Optional[str]:
+    """Peor escenario de nivel de tensión entre todos los proyectos activos del terreno:
+    si alguno reporta 34.5kV (el único nivel con sobrecosto hoy en nivel_tension.ts), ese
+    nivel manda para todo el terreno. Si ninguno lo reporta, se usa el primer valor no
+    nulo encontrado (no hay sobrecosto en juego, cualquier valor consistente sirve para
+    mostrar). Consulta requestsdb (cae a originabotdb si no hay DATABASE_URL2)."""
+    if not project_ids:
+        return None
+    db2_url = os.environ.get('DATABASE_URL2') or os.environ.get('DATABASE_URL')
+    try:
+        conn = _connect(db2_url)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """SELECT DISTINCT ON (project) project, tension_level
+                       FROM supplies_supplyrequest
+                       WHERE project = ANY(%s) AND tension_level IS NOT NULL
+                       ORDER BY project, id DESC""",
+                    (project_ids,),
+                )
+                rows = cur.fetchall()
+        finally:
+            conn.close()
+    except Exception:
+        return None
+
+    valores = []
+    for r in rows:
+        raw = r['tension_level'] or ''
+        num = raw.replace(' ', '').lower().replace('kv', '').strip()
+        valores.append(_TENSION_MAP.get(num) or (raw.strip() or None))
+    valores = [v for v in valores if v]
+    if not valores:
+        return None
+    return max(valores, key=lambda v: _TENSION_RANK.get(v, 0))
+
+
+_TENSION_MAP = {'13.8': '13.8kV', '13.2': '13.8kV', '34.5': '34.5kV', '115': '115kV', '110': '115kV'}
+_TENSION_RANK = {'34.5kV': 1}  # única con sobrecosto hoy (nivel_tension.ts computeCost); el resto rank 0
+
+
+# Estados de validation_field.status (workflow de originabotdb)
+_VALIDATION_STATUS_LABELS = {
+    'approved': 'Aprobada',
+    'preapproved': 'Pre-aprobada',
+    'pending': 'Pendiente',
+    'request': 'Solicitada',
+    'exonerated': 'Exonerada',
 }
+
+_TIPO_LABELS = {'own': 'Propia', 'public': 'Pública', 'foreign': 'Ajena', 'public_and_foreign': 'Pública y Ajena'}
+_EASEMENT_STATUS_LABELS = {
+    'validation': 'En validación',
+    'negotiation': 'En negociación',
+    'not_viable': 'No viable',
+    'signed': 'Firmada',
+    'pending': 'Pendiente',
+    'initial': 'Inicial',
+    'obtained_license': 'Licencia obtenida',
+}
+
+
+def _resolve_servidumbre(vf_value: Optional[str], vf_status: Optional[str],
+                          easement_type: Optional[str],
+                          easement_foreign_status: Optional[str],
+                          easement_public_status: Optional[str]) -> tuple[Optional[str], bool, Optional[str]]:
+    """Resuelve tipo + estado de resolución de servidumbre para UN proyecto, con la MISMA
+    fuente para tipo y estado (no cruza validation_field con easements_easement para el
+    estado si el tipo vino del otro). Retorna (tipo, resuelto, estado_label)."""
+    vf_value = (vf_value or '').lower()
+    if vf_value:
+        if 'pública y ajena' in vf_value or 'publica y ajena' in vf_value:
+            tipo = 'public_and_foreign'
+        elif 'propia' in vf_value:
+            tipo = 'own'
+        elif 'pública' in vf_value or 'publica' in vf_value:
+            tipo = 'public'
+        elif 'ajena' in vf_value:
+            tipo = 'foreign'
+        else:
+            tipo = None
+        resuelto = tipo == 'own' or vf_status == 'approved'
+        estado_label = _VALIDATION_STATUS_LABELS.get(vf_status, vf_status) if vf_status else 'Sin registro'
+        return tipo, resuelto, estado_label
+    if easement_type:
+        tipo = easement_type
+        if tipo == 'own':
+            return tipo, True, 'N/A'
+        if tipo == 'foreign':
+            resuelto = easement_foreign_status == 'signed'
+            estado_label = _EASEMENT_STATUS_LABELS.get(easement_foreign_status, easement_foreign_status) if easement_foreign_status else 'Sin registro'
+            return tipo, resuelto, estado_label
+        resuelto = easement_public_status == 'obtained_license'
+        estado_label = _EASEMENT_STATUS_LABELS.get(easement_public_status, easement_public_status) if easement_public_status else 'Sin registro'
+        return tipo, resuelto, estado_label
+    return None, False, None
+
+
+def _get_servidumbre(terrain_id: int) -> tuple[Optional[int], Optional[dict]]:
+    """Peor escenario de servidumbre entre todos los proyectos activos del terreno: si
+    alguno no está resuelto, el terreno completo requiere ingreso manual de meses de
+    retraso (None). Si todos están resueltos, no hay sobrecosto (0). easements_easement
+    ya es una tabla terreno-completo (no por proyecto) — se consulta una sola vez y sirve
+    de fallback para cualquier proyecto sin registro en validation_field."""
+    try:
+        conn = _connect(os.environ['DATABASE_URL'])
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """SELECT type, foreign_status, public_status FROM easements_easement
+                       WHERE terrain_id = %s AND character = 'electrical'
+                       ORDER BY id DESC LIMIT 1""",
+                    (terrain_id,),
+                )
+                easement_row = cur.fetchone()
+                easement_type = easement_row['type'] if easement_row else None
+                easement_foreign_status = easement_row['foreign_status'] if easement_row else None
+                easement_public_status = easement_row['public_status'] if easement_row else None
+
+                cur.execute(
+                    """SELECT DISTINCT ON (vf.project_id) vf.value, vf.status
+                       FROM validation_field vf
+                       JOIN minifarm_project p ON p.id = vf.project_id
+                       WHERE p.terrain_id = %s
+                         AND p.stage NOT IN ('dead', 'paused', 'uci')
+                         AND vf.name = 'Servidumbre'
+                         AND vf.value IS NOT NULL
+                       ORDER BY vf.project_id, vf.id DESC""",
+                    (terrain_id,),
+                )
+                vf_rows = cur.fetchall()
+        finally:
+            conn.close()
+    except Exception:
+        return None, None
+
+    resultados = [
+        _resolve_servidumbre(r['value'], r['status'], easement_type, easement_foreign_status, easement_public_status)
+        for r in vf_rows
+    ]
+    if not resultados and easement_type:
+        resultados = [_resolve_servidumbre(None, None, easement_type, easement_foreign_status, easement_public_status)]
+    if not resultados:
+        return None, None
+
+    peor = next((r for r in resultados if not r[1]), resultados[0])
+    tipo, _resuelto_peor, estado_label = peor
+    todos_resueltos = all(r[1] for r in resultados)
+
+    detalle = {'tipo': _TIPO_LABELS.get(tipo, tipo), 'estado': estado_label} if tipo else None
+    return (0 if todos_resueltos else None), detalle
+
+
+# Estados que se consideran resueltos (sin sobrecosto) para 'Ocupación de cauce'
+_OCUPACION_RESUELTO = {'no requiere', 'aprobado', 'exonerado'}
+
+
+def _get_ocupacion_cauce(terrain_id: int) -> tuple[Optional[bool], Optional[str]]:
+    """Peor escenario de 'Ocupación de cauce' entre todos los proyectos activos del
+    terreno: si alguno tiene un estado no resuelto, el terreno completo carga el
+    sobrecosto. Retorna (aplica_sobrecosto, detalle) del peor estado encontrado."""
+    try:
+        conn = _connect(os.environ['DATABASE_URL'])
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """SELECT DISTINCT ON (vf.project_id) vf.value, vf.status
+                       FROM validation_field vf
+                       JOIN minifarm_project p ON p.id = vf.project_id
+                       WHERE p.terrain_id = %s
+                         AND p.stage NOT IN ('dead', 'paused', 'uci')
+                         AND vf.name = 'Ocupación de cauce'
+                         AND (vf.value IS NOT NULL OR vf.status = 'exonerated')
+                       ORDER BY vf.project_id, vf.id DESC""",
+                    (terrain_id,),
+                )
+                rows = cur.fetchall()
+        finally:
+            conn.close()
+    except Exception:
+        return None, None
+
+    peor_detalle = None
+    aplica_sobrecosto = False
+    for r in rows:
+        raw = (r['value'] or '').strip()
+        if not raw and r['status'] == 'exonerated':
+            raw = 'Exonerado'
+        if raw.startswith('/media/') or raw.startswith('validation/'):
+            raw = 'Evidencia sin resolver'
+        if not raw:
+            continue
+        no_resuelto = raw.lower() not in _OCUPACION_RESUELTO
+        if no_resuelto:
+            aplica_sobrecosto = True
+            peor_detalle = raw
+        elif peor_detalle is None:
+            peor_detalle = raw
+    if peor_detalle is None:
+        return None, None
+    return aplica_sobrecosto, peor_detalle
+
+
+# Estados de entities_coexistence.status que se consideran resueltos (sin sobrecosto)
+_COEXISTENCIA_RESUELTA = {'approved', 'not_applicable'}
+_ESTADO_LABELS = {
+    'approved': 'Aprobado',
+    'pending': 'Pendiente',
+    'sent': 'Enviado',
+    'communication': 'En comunicación',
+    'not_applicable': 'No aplica',
+}
+
+
+def _get_coexistencias_terreno(project_ids: list[int]) -> tuple[bool, list[dict]]:
+    """Consulta solicitudes de coexistencia (entities_coexistence) de TODOS los proyectos
+    activos del terreno (requestsdb). aplica_sobrecosto es True si alguna solicitud de
+    CUALQUIER proyecto está en un estado distinto de resuelto/aprobado (peor escenario)."""
+    if not project_ids:
+        return False, []
+    db2_url = os.environ.get('DATABASE_URL2') or os.environ.get('DATABASE_URL')
+    try:
+        conn = _connect(db2_url)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """SELECT c.status, o.name AS operator_name
+                       FROM entities_coexistence c
+                       LEFT JOIN entities_operator o ON o.id = c.operator_id
+                       WHERE c.project_id = ANY(%s)
+                       ORDER BY o.name""",
+                    ([str(pid) for pid in project_ids],),
+                )
+                rows = cur.fetchall()
+                detalle = [
+                    {
+                        'entidad': r['operator_name'] or 'Desconocido',
+                        'estado': _ESTADO_LABELS.get(r['status'], r['status']),
+                    }
+                    for r in rows
+                ]
+                aplica_sobrecosto = any(r['status'] not in _COEXISTENCIA_RESUELTA for r in rows)
+                return aplica_sobrecosto, detalle
+        finally:
+            conn.close()
+    except Exception:
+        return False, []
+
+
+# Estados del valor de 'Licencia de aprovechamiento forestal' que se consideran resueltos
+_APROV_RESUELTO = {'exonerado', 'solicitud aprobada'}
+_APROV_NIVEL_RANK = {'visita': 1, 'solicitud radicada': 2}
+_APROV_NIVEL_DEFAULT_RANK = 3  # cualquier otro estado no resuelto (Pausado, Programado, etc.)
+_APROV_RANK_TO_NIVEL = {1: 'visita', 2: 'radicada', 3: 'otro'}
+
+
+def _resolve_aprovechamiento_nivel(raw: str) -> Optional[str]:
+    """Resuelve el valor crudo de 'Licencia de aprovechamiento forestal' de UN proyecto a
+    None (resuelto/sin registro), 'visita', 'radicada' u 'otro'. Sin peor-escenario —
+    aprovechamiento_forestal es scope 'proyecto': cada proyecto usa solo su propio dato."""
+    low = raw.lower()
+    if not raw or low in _APROV_RESUELTO:
+        return None
+    rank = _APROV_NIVEL_RANK.get(low, _APROV_NIVEL_DEFAULT_RANK)
+    return _APROV_RANK_TO_NIVEL[rank]
+
+
+def _get_proyectos_activos(terrain_id: int) -> list[dict]:
+    """Proyectos activos del terreno (mismo filtro de stage que 'cluster'). Devuelve los
+    5 campos de scope 'proyecto' — distancia_via/distancia_red (columnas propias de
+    minifarm_project, ya per-proyecto), tipo_estructura, numero_arboles y
+    aprovechamiento_forestal (validation_field por project_id, sin peor-escenario) —
+    cada uno resuelto individualmente por proyecto, sin funnel a un valor compartido."""
+    conn = _connect(os.environ['DATABASE_URL'])
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT
+                       p.name                                      AS nombre,
+                       p.road_distance                             AS distancia_via,
+                       p.network_distance                          AS distancia_red,
+                       (
+                           SELECT vf.value FROM validation_field vf
+                           WHERE (vf.project_id = p.id OR vf.terrain_id = p.terrain_id)
+                             AND vf.name = 'Tipo de arreglo'
+                             AND vf.value IS NOT NULL
+                           ORDER BY vf.id DESC LIMIT 1
+                       )                                           AS tipo_raw,
+                       (
+                           SELECT vf.value FROM validation_field vf
+                           WHERE vf.project_id = p.id
+                             AND vf.name = 'Número de árboles'
+                             AND vf.value IS NOT NULL
+                           ORDER BY vf.id DESC LIMIT 1
+                       )                                           AS numero_arboles_raw,
+                       (
+                           SELECT vf.value FROM validation_field vf
+                           WHERE vf.project_id = p.id
+                             AND vf.name = 'Licencia de aprovechamiento forestal'
+                           ORDER BY vf.id DESC LIMIT 1
+                       )                                           AS aprov_value,
+                       (
+                           SELECT vf.status FROM validation_field vf
+                           WHERE vf.project_id = p.id
+                             AND vf.name = 'Licencia de aprovechamiento forestal'
+                           ORDER BY vf.id DESC LIMIT 1
+                       )                                           AS aprov_status
+                   FROM minifarm_project p
+                   WHERE p.terrain_id = %s
+                     AND p.stage NOT IN ('dead', 'paused', 'uci')
+                   ORDER BY p.id""",
+                (terrain_id,),
+            )
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    proyectos = []
+    for r in rows:
+        tipo_raw = (r['tipo_raw'] or '').upper()
+        if '1P' in tipo_raw or '2P' in tipo_raw:
+            tipo_estructura = 'tracker'
+        elif 'MESA' in tipo_raw:
+            tipo_estructura = 'mesa_fija'
+        else:
+            tipo_estructura = None
+
+        arboles_raw = (r['numero_arboles_raw'] or '').strip()
+        numero_arboles = int(arboles_raw) if arboles_raw.isdigit() else None
+
+        aprov_raw = (r['aprov_value'] or '').strip()
+        if not aprov_raw and r['aprov_status'] == 'exonerated':
+            aprov_raw = 'Exonerado'
+
+        proyectos.append({
+            'nombre': r['nombre'],
+            'distancia_via': r['distancia_via'],
+            'distancia_red': r['distancia_red'],
+            'tipo_estructura': tipo_estructura,
+            'numero_arboles': numero_arboles,
+            'aprovechamiento_forestal': _resolve_aprovechamiento_nivel(aprov_raw),
+        })
+    return proyectos
+
+
+def get_terrain_data(code: str) -> Optional[dict]:
+    """Fetch terrain data from PostgreSQL. Returns None if terrain not found."""
+    database_url = os.environ['DATABASE_URL']
+    conn = _connect(database_url)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    t.id                                        AS terrain_id,
+                    t.name                                      AS code,
+                    t.radiation                                 AS produccion_especifica,
+                    p.name                                      AS name,
+                    tc.name                                     AS municipality,
+                    p.grid_operator_id                          AS "or",
+                    (
+                        SELECT COUNT(*)
+                        FROM minifarm_project mp2
+                        WHERE mp2.terrain_id = t.id
+                          AND mp2.stage NOT IN ('dead', 'paused', 'uci')
+                    )                                           AS cluster,
+                    (
+                        SELECT ts.rent_annual_cost_cop
+                        FROM termsheet_termsheet ts
+                        WHERE ts.id = p.termsheet_id
+                    )                                           AS arriendo_anual
+
+                FROM termsheet_terrain t
+                JOIN minifarm_project p ON p.terrain_id = t.id
+                LEFT JOIN territorial_city tc ON tc.id = t.city_id
+                WHERE UPPER(t.name) = UPPER(%s)
+                ORDER BY p.id DESC
+                LIMIT 1
+            """, (code,))
+            row = cur.fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        return None
+
+    d = dict(row)
+    terrain_id: int = d.pop('terrain_id')
+
+    # municipio: derivado del nombre del proyecto "{CODIGO}_{MUNICIPIO}_{ZONA}"
+    # (territorial_city.name puede estar mal asignado en el terreno). Cae a tc.name si no matchea el patrón.
+    name_parts = (d.get('name') or '').split('_')
+    if len(name_parts) >= 3:
+        d['municipality'] = name_parts[-2].replace('-', ' ').title()
+
+    # operador de red: frontend usa mayúsculas (AFINIA, ESSA, EPM…)
+    if d.get('or'):
+        d['or'] = d['or'].upper()
+
+    project_ids = _get_active_project_ids(terrain_id)
+
+    d['nivel_tension'] = _get_nivel_tension_terreno(project_ids)
+    d['ocupacion_cauce'], d['ocupacion_cauce_detalle'] = _get_ocupacion_cauce(terrain_id)
+    d['servidumbre'], d['servidumbre_detalle'] = _get_servidumbre(terrain_id)
+    d['coexistencias'], d['coexistencias_detalle'] = _get_coexistencias_terreno(project_ids)
+    d['proyectos'] = _get_proyectos_activos(terrain_id)
+
+    return d
 ```
 
-Replace it with:
+- [ ] **Step 4: Run tests to verify they pass**
 
-```ts
-export interface ChecklistItemDef {
-  key: string
-  label: string
-  unit: string
-  group: 'metro' | 'fijo'
-  groupLabel: string
-  tarifa: number
-}
+Run (from `backend/`): `./venv/Scripts/python.exe -m pytest tests/test_terrain_service.py -v`
 
-export interface CriterionModule {
-  id: string
-  label: string
-  inputType: 'number' | 'toggle' | 'select' | 'checklist'
-  unit?: string
-  dataSource: 'manual' | 'db' | 'db_or_manual'
-  dbField?: string
-  options?: SelectOption[]
-  formulaDefined: boolean
-  category: CriterionCategory
-  riskType?: RiskType
-  checklistItems?: ChecklistItemDef[]
-  computeCost: (value: CriterionValue, context: EvalContext) => number
-}
-```
+Expected: PASS — all 8 tests pass.
 
-- [ ] **Step 3: Write the failing tests in `frontend/src/criteria/__tests__/criteria.test.ts`**
+- [ ] **Step 5: Update `backend/tests/test_terrain.py`**
 
-Add this import at the top of the file, alongside the other criterion imports (after line 11, `import distanciaVia from '../distancia_via'`):
+Find (lines 25-44):
 
-```ts
-import obrasHidraulicas from '../obras_hidraulicas'
-```
-
-Append this `describe` block at the end of the file (after the closing `})` of the `distancia_via` describe block):
-
-```ts
-
-describe('obras_hidraulicas', () => {
-  const vacio = {
-    canal_concreto: { activo: false, cantidad: null },
-    cuneta_via: { activo: false, cantidad: null },
-    box_culvert: { activo: false, cantidad: null },
-    alcantarilla_cruce: { activo: false, cantidad: null },
-  }
-
-  it('calcula 40m de canal en concreto a 1.300.000/m', () => {
-    const value = { ...vacio, canal_concreto: { activo: true, cantidad: 40 } }
-    expect(obrasHidraulicas.computeCost(value, ctx)).toBe(52_000_000)
-  })
-
-  it('suma varios tipos activos (canal + box culvert)', () => {
-    const value = {
-      ...vacio,
-      canal_concreto: { activo: true, cantidad: 40 },
-      box_culvert: { activo: true, cantidad: 1 },
+```python
+def test_terrain_returns_data(client):
+    mock_data = {
+        'code': 'COLCEST5', 'name': 'Test', 'municipality': 'Aguachica',
+        'distancia_via': 120, 'distancia_red': 350, 'or': 'AFINIA',
+        'nivel_tension': '34.5 kV', 'cluster': 2, 'tipo_estructura': 'Tracker',
+        'ocupacion_cauce': False, 'servidumbre': 'own',
+        'aprovechamiento_forestal': 'Exonerado', 'coexistencias': False,
+        'produccion_especifica': 4.5287, 'arriendo_anual': 26275000.0,
     }
-    expect(obrasHidraulicas.computeCost(value, ctx)).toBe(52_000_000 + 170_000_000)
-  })
-
-  it('ignora la cantidad de un ítem no activo', () => {
-    const value = { ...vacio, alcantarilla_cruce: { activo: false, cantidad: 3 } }
-    expect(obrasHidraulicas.computeCost(value, ctx)).toBe(0)
-  })
-
-  it('retorna 0 para valor nulo', () => {
-    expect(obrasHidraulicas.computeCost(null, ctx)).toBe(0)
-  })
-
-  it('tiene formulaDefined true y category fijo', () => {
-    expect(obrasHidraulicas.formulaDefined).toBe(true)
-    expect(obrasHidraulicas.category).toBe('fijo')
-  })
-})
+    with patch('app.routes.terrain.validate_token', return_value={'pk': 1}), \
+         patch('app.services.terrain_service.get_terrain_data', return_value=mock_data):
+        response = client.get(
+            '/api/terrain/COLCEST5',
+            headers={'Authorization': 'Bearer fake-token'}
+        )
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data['code'] == 'COLCEST5'
+    assert data['distancia_via'] == 120
 ```
 
-- [ ] **Step 4: Run tests to verify they fail**
+Replace with:
 
-Run (from `frontend/`): `npx vitest run src/criteria/__tests__/criteria.test.ts`
-
-Expected: FAIL — the `obras_hidraulicas` tests fail because the current module always returns `0` from `computeCost` regardless of input (it's still the qualitative placeholder), so the "40m de canal" and "suma varios tipos" assertions fail (expected `52_000_000`, got `0`).
-
-- [ ] **Step 5: Rewrite `frontend/src/criteria/obras_hidraulicas.ts`**
-
-Replace the entire file content with:
-
-```ts
-import type { ChecklistItemDef, CriterionModule, CriterionValue, EvalContext, ObrasHidraulicasValue } from '@/types'
-
-const ITEMS: ChecklistItemDef[] = [
-  { key: 'canal_concreto', label: 'Canal en concreto (2m x 0.5m)', unit: 'm', group: 'metro', groupLabel: 'Costo por metro lineal', tarifa: 1_300_000 },
-  { key: 'cuneta_via', label: 'Cuneta típica de vía', unit: 'm', group: 'metro', groupLabel: 'Costo por metro lineal', tarifa: 300_000 },
-  { key: 'box_culvert', label: 'Box culvert (3m x 3m)', unit: 'cruces', group: 'fijo', groupLabel: 'Costo fijo por cruce', tarifa: 170_000_000 },
-  { key: 'alcantarilla_cruce', label: 'Alcantarilla (Ø0.9m)', unit: 'cruces', group: 'fijo', groupLabel: 'Costo fijo por cruce', tarifa: 50_000_000 },
-]
-
-const obrasHidraulicas: CriterionModule = {
-  id: 'obras_hidraulicas',
-  label: 'Obras hidráulicas',
-  inputType: 'checklist',
-  dataSource: 'manual',
-  formulaDefined: true,
-  category: 'fijo',
-  checklistItems: ITEMS,
-  computeCost(value: CriterionValue, _context: EvalContext): number {
-    if (!value || typeof value !== 'object') return 0
-    const v = value as ObrasHidraulicasValue
-    return ITEMS.reduce((total, item) => {
-      const entry = v[item.key as keyof ObrasHidraulicasValue]
-      if (!entry?.activo || typeof entry.cantidad !== 'number') return total
-      return total + entry.cantidad * item.tarifa
-    }, 0)
-  },
-}
-
-export default obrasHidraulicas
+```python
+def test_terrain_returns_data(client):
+    mock_data = {
+        'code': 'COLCEST5', 'name': 'Test', 'municipality': 'Aguachica',
+        'or': 'AFINIA', 'nivel_tension': '34.5 kV', 'cluster': 2,
+        'ocupacion_cauce': False, 'servidumbre': 0, 'servidumbre_detalle': None,
+        'coexistencias': False, 'coexistencias_detalle': [],
+        'produccion_especifica': 4.5287, 'arriendo_anual': 26275000.0,
+        'proyectos': [
+            {
+                'nombre': 'COLCEST5P1_AGUACHICA_SUR', 'distancia_via': 120, 'distancia_red': 350,
+                'tipo_estructura': 'tracker', 'numero_arboles': 0, 'aprovechamiento_forestal': None,
+            },
+        ],
+    }
+    with patch('app.routes.terrain.validate_token', return_value={'pk': 1}), \
+         patch('app.services.terrain_service.get_terrain_data', return_value=mock_data):
+        response = client.get(
+            '/api/terrain/COLCEST5',
+            headers={'Authorization': 'Bearer fake-token'}
+        )
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data['code'] == 'COLCEST5'
+    assert data['proyectos'][0]['distancia_via'] == 120
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [ ] **Step 6: Run the full backend suite**
 
-Run (from `frontend/`): `npx vitest run src/criteria/__tests__/criteria.test.ts`
+Run (from `backend/`): `./venv/Scripts/python.exe -m pytest tests/ -v`
 
-Expected: PASS — all tests in the file pass, including the 5 new `obras_hidraulicas` tests.
+Expected: all pass except `test_terrain_requires_auth` (pre-existing local-env artifact, see Global Constraints).
 
-- [ ] **Step 7: Run the full test suite and type-check**
+- [ ] **Step 7: Smoke-test against the live dev backend**
 
-Run (from `frontend/`): `npx vitest run`
-Expected: all test files pass (no regressions in other criteria/engine/store tests).
+If the backend dev server is running (`http://127.0.0.1:5000`), restart it (it auto-reloads on file save with Flask debug mode) and run:
 
-Run (from `frontend/`): `npx vue-tsc -b`
-Expected: exactly the 2 pre-existing unrelated errors listed in Global Constraints — no new errors referencing `obras_hidraulicas.ts` or `types/index.ts`.
+```bash
+curl -s http://127.0.0.1:5000/api/terrain/COLSANT5
+```
+
+Expected: JSON response with a `proyectos` array containing 2 entries (P1, P2), each with its own `numero_arboles` (P1: `2`, P2: `0`) — no top-level `distancia_via`/`numero_arboles`/`aprovechamiento_forestal` keys.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add frontend/src/types/index.ts frontend/src/criteria/obras_hidraulicas.ts frontend/src/criteria/__tests__/criteria.test.ts
-git commit -m "feat: replace obras_hidraulicas placeholder with real checklist formula"
+git add backend/app/services/terrain_service.py backend/tests/test_terrain.py backend/tests/test_terrain_service.py
+git commit -m "feat: return proyectos[] with per-project data, fix worst-case for terrain-wide criteria"
 ```
 
 ---

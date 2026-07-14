@@ -1,109 +1,163 @@
-# Task 2 Report: Checklist UI in CriterionCard.vue
+# Task 2 Implementation Report: Frontend types — CriterionScope, ProyectoData, EvalContext.projectCount
 
-## Summary
-Successfully implemented all 5 steps of Task 2: added grouped checklist UI for the `obras_hidraulicas` criterion in `CriterionCard.vue`.
+## Status
+**DONE_WITH_CONCERNS** — Implementation complete and tested, with expected type errors in files outside this task's scope (Task 4 and 5 will resolve them).
 
-## Implementation Details
+## What Was Implemented
 
-### Step 1: Type Import
-✓ Updated line 5 to import `ObrasHidraulicasValue` and `ObraHidraulicaItem` from `@/types`
+### Step 1: Updated `frontend/src/types/index.ts`
+- Added `CriterionScope` type definition: `'proyecto' | 'terreno_dividido' | 'terreno_multiplicado' | 'terreno_no_dividido'`
+- Added `ProyectoData` interface with fields: `nombre`, `distancia_via`, `distancia_red`, `aprovechamiento_forestal`, `numero_arboles`, `tipo_estructura`
+- Updated `EvalContext` interface to include optional `projectCount?: number` field
+- Updated `CriterionModule` interface to include required `scope: CriterionScope` field
+- Updated `TerrainData` interface:
+  - Removed project-level fields: `distancia_via`, `distancia_red`, `tipo_estructura`, `numero_arboles`, `aprovechamiento_forestal`, `aprovechamiento_forestal_detalle`
+  - Added new field: `proyectos: ProyectoData[]`
+- Deleted `ProyectoEstadoDetalle` interface (no longer used)
 
-### Step 2: Checklist Computeds and Handlers
-✓ Added after `accentColor` computed (lines 18-59):
-- `EMPTY_OBRAS_HIDRAULICAS` constant with all 4 correct item keys:
-  - `canal_concreto`
-  - `cuneta_via`
-  - `box_culvert`
-  - `alcantarilla_cruce`
-- `checklistValue` computed: reads `props.result.value` and falls back to empty state
-- `checklistItem(key)` helper: retrieves item data by key
-- `checklistGroups` computed: groups items by `item.group`, preserving `groupLabel` and order
-- `handleChecklistToggle(key, event)`: updates `activo` property and calls store
-- `handleChecklistCantidad(key, event)`: parses quantity, handles empty strings as null
+### Step 2: Added `scope` field to all 18 criteria modules
+Updated the following files with appropriate `scope` values:
 
-### Step 3: Dynamic Class
-✓ Added `:class="{ 'card-input--checklist': module?.inputType === 'checklist' }"` to `.card-input` (line 120)
+**scope: 'proyecto'** (6 files):
+- `frontend/src/criteria/distancia_via.ts`
+- `frontend/src/criteria/distancia_red.ts`
+- `frontend/src/criteria/numero_arboles.ts`
+- `frontend/src/criteria/aprovechamiento_forestal.ts`
+- `frontend/src/criteria/pilotes.ts`
+- `frontend/src/criteria/tipo_estructura.ts`
 
-### Step 4: Checklist Template Branch
-✓ Added new template branch (lines 160-187) correctly nested in the v-if/v-else-if chain:
-- Loops through `checklistGroups` with correct keys
-- Displays group labels (uppercase, muted, with letter-spacing)
-- For each item: checkbox input with `@change="handleChecklistToggle(item.key, $event)"`
-- Conditional quantity field (appears only when `activo` is true)
-- Quantity input with `@input="handleChecklistCantidad(item.key, $event)"`
-- Unit label display
+**scope: 'terreno_dividido'** (10 files):
+- `frontend/src/criteria/corte.ts`
+- `frontend/src/criteria/lleno.ts`
+- `frontend/src/criteria/obras_hidraulicas.ts`
+- `frontend/src/criteria/ocupacion_cauce.ts`
+- `frontend/src/criteria/coexistencias.ts`
+- `frontend/src/criteria/comunidad.ts`
+- `frontend/src/criteria/or.ts`
+- `frontend/src/criteria/propietario.ts`
+- `frontend/src/criteria/servidumbre.ts`
+- `frontend/src/criteria/amenazas.ts`
 
-### Step 5: CSS Styling
-✓ Added 9 CSS rules (lines 368-389):
-- `.card-input--checklist`: flex-direction column, align-items stretch
-- `.checklist-groups`: flex column with 0.75rem gap, full width
-- `.checklist-group`: flex column with 0.4rem gap
-- `.checklist-group-label`: 0.68rem, bold, uppercase, 0.6px letter-spacing, muted color
-- `.checklist-item`: flex column with 0.35rem gap
-- `.checklist-item-label`: flex center, gap 0.5rem, cursor pointer, 0.82rem, text color
-- `.checklist-item-cantidad`: flex center, 0.5rem gap, 1.6rem left padding
-- `.input-field--small`: reduced padding (0.35rem 0.6rem), reduced font (0.8rem)
+**scope: 'terreno_multiplicado'** (1 file):
+- `frontend/src/criteria/nivel_tension.ts`
 
-## Type Checking Results
+**scope: 'terreno_no_dividido'** (1 file):
+- `frontend/src/criteria/cluster.ts`
+
+### Step 3: Added scope coverage test
+Added test case to `frontend/src/engine/__tests__/evaluatorEngine.test.ts`:
+```typescript
+it('todos tienen un scope válido', () => {
+  const criteria = loadCriteria()
+  const validScopes = ['proyecto', 'terreno_dividido', 'terreno_multiplicado', 'terreno_no_dividido']
+  for (const c of criteria) {
+    expect(validScopes).toContain(c.scope)
+  }
+})
 ```
-src/engine/__tests__/evaluatorEngine.test.ts(10,3): error TS2578: Unused '@ts-expect-error' directive.
-vite.config.ts(13,3): error TS2769: No overload matches this call.
+
+## Testing Results
+
+### Step 2b: Verification
+Verified all 18 criteria files have `scope:` field using grep — found exactly 18 files with scope, zero files missing it.
+
+### Step 4: Test execution
 ```
-✓ Only 2 pre-existing errors (as expected). No new errors in CriterionCard.vue.
-
-## Test Suite Results
+evaluatorEngine.test.ts: 11/11 tests PASS ✓ (10 existing + 1 new scope coverage test)
 ```
-Test Files  1 failed | 5 passed (6)
-Tests  2 failed | 71 passed (73)
+The new test specifically validates that all loaded criteria have a valid scope value.
+
+### Step 5: Full suite and type-check results
+
+**vitest run (evaluator-related tests):**
 ```
-✓ 2 pre-existing authStore test failures (unrelated to this task). No regressions introduced by the checklist UI changes.
+Test Files: 2 passed (evaluatorEngine + criteria)
+Tests: 55 passed
+```
+All evaluator and criteria tests pass. Pre-existing test failures in authStore are unrelated to this task.
 
-## Manual Code Trace Verification
+**npx vue-tsc -b results:**
+```
+Errors found: 4 total
+- 2 pre-existing unrelated errors (as expected):
+  × evaluatorEngine.test.ts(10,3): Unused '@ts-expect-error' directive
+  × vite.config.ts(13,3): No overload matches this call (UserConfigExport test config)
+  
+- 2 expected new errors from TerrainData schema changes (will be fixed by Task 4-5):
+  × CriterionCard.vue(83,29): Property 'aprovechamiento_forestal_detalle' does not exist
+  × evaluatorStore.test.ts(11,3): Property 'distancia_via' does not exist in TerrainData
+```
 
-### Correctness Checks
-1. ✓ All 4 item keys present and correctly spelled in `EMPTY_OBRAS_HIDRAULICAS`
-2. ✓ `checklistValue` computed safely handles non-object values
-3. ✓ `checklistItem(key)` correctly accesses by key and returns `ObraHidraulicaItem`
-4. ✓ `checklistGroups` properly buckets by `item.group` and preserves `groupLabel`
-5. ✓ `handleChecklistToggle` correctly updates `activo` property
-6. ✓ `handleChecklistCantidad` correctly converts to number/null, ignores quantity when `activo` is false
-7. ✓ Dynamic class `.card-input--checklist` applies only when `module?.inputType === 'checklist'`
-8. ✓ Template branch correctly nested in v-if/v-else-if chain (after select, before closing div)
-9. ✓ Group loop: `v-for="group in checklistGroups" :key="group.groupLabel"`
-10. ✓ Item loop: `v-for="item in group.items" :key="item.key"`
-11. ✓ Checkbox bound to `checklistItem(item.key).activo`
-12. ✓ Checkbox @change calls `handleChecklistToggle(item.key, $event)`
-13. ✓ Quantity field visibility: `v-if="checklistItem(item.key).activo"`
-14. ✓ Quantity input @input calls `handleChecklistCantidad(item.key, $event)`
-15. ✓ Unit label: `{{ item.unit }}`
-16. ✓ All CSS classes present and correctly scoped (no conflicts with existing rules)
+These errors are expected because Task 1 changed the API response shape, and:
+- Task 4 (evaluatorStore.ts) will wire the new `proyectos` field into the store
+- Task 5 (CriterionCard.vue) will update the UI to reference the new per-project fields
 
-### Event Wiring Summary
-- **Checkbox @change:** `handleChecklistToggle(item.key, $event)` → updates `activo` → `store.setCriterionValue(id, updated)`
-- **Quantity @input:** `handleChecklistCantidad(item.key, $event)` → updates `cantidad` → `store.setCriterionValue(id, updated)`
-- **Conditional rendering:** Quantity field appears only when checkbox is checked (`activo: true`)
-- **Store integration:** Both handlers call the existing `store.setCriterionValue(props.result.id, updated)` with the full `ObrasHidraulicasValue` object
-
-## Important Limitation
-**Interactive browser verification was NOT performed.** This is not possible in this automated environment (no browser, no Playwright/Chromium driver). A human with a real browser must verify:
-- Opening the works ("Obras hidráulicas") card
-- Seeing the two group labels ("Costo por metro lineal" and "Costo fijo por cruce")
-- Checking/unchecking items and seeing the quantity field appear/disappear
-- Entering quantities and seeing the sobrecosto/CAPEX total update correctly
-- Unchecking an item with a quantity still entered and confirming the cost drops (quantity ignored when unchecked)
+This task correctly introduced the schema changes; downstream consumers will be updated in later tasks.
 
 ## Files Changed
-- `frontend/src/components/CriterionCard.vue` (97 lines added)
+
+**Modified (20 files total):**
+- frontend/src/types/index.ts (4 sections)
+- frontend/src/criteria/distancia_via.ts
+- frontend/src/criteria/distancia_red.ts
+- frontend/src/criteria/numero_arboles.ts
+- frontend/src/criteria/aprovechamiento_forestal.ts
+- frontend/src/criteria/pilotes.ts
+- frontend/src/criteria/tipo_estructura.ts
+- frontend/src/criteria/corte.ts
+- frontend/src/criteria/lleno.ts
+- frontend/src/criteria/obras_hidraulicas.ts
+- frontend/src/criteria/ocupacion_cauce.ts
+- frontend/src/criteria/coexistencias.ts
+- frontend/src/criteria/comunidad.ts
+- frontend/src/criteria/or.ts
+- frontend/src/criteria/propietario.ts
+- frontend/src/criteria/servidumbre.ts
+- frontend/src/criteria/amenazas.ts
+- frontend/src/criteria/nivel_tension.ts
+- frontend/src/criteria/cluster.ts
+- frontend/src/engine/__tests__/evaluatorEngine.test.ts
+
+## Self-Review Findings
+
+**Completeness:** ✓
+- All 18 criteria files updated with scope field
+- New types (CriterionScope, ProyectoData) added and integrated
+- EvalContext and CriterionModule interfaces updated
+- TerrainData schema updated per spec
+- ProyectoEstadoDetalle deleted as specified
+- Test coverage added for scope field
+
+**Quality:** ✓
+- Code follows existing patterns and style (no restructuring of criteria files)
+- Changes are minimal and focused (only added scope, no other modifications)
+- Test correctly validates all scope values are valid
+- Type definitions match the new API response shape from Task 1
+
+**Discipline:** ✓
+- Stayed within task scope — only modified files specified in the brief
+- No changes to UI or evaluation logic (that's Tasks 3-6)
+- No unauthorized modifications to test fixtures or other code
+
+**Type Safety:** ✓
+- New `scope` field is required on CriterionModule (not optional)
+- All 18 criteria modules provide the field
+- CriterionScope type is narrow and explicit (4 valid values)
+- `projectCount` is optional on EvalContext to avoid breaking existing code
+
+## Concerns
+
+**Expected type errors (not failures):** The type-check output shows 2 new errors in CriterionCard.vue and evaluatorStore.test.ts referencing removed TerrainData fields. These are expected because:
+1. Task 1 changed the API shape to return `proyectos: list[dict]` instead of top-level fields
+2. This task propagates that change into the frontend type system
+3. Task 4 and Task 5 are responsible for wiring up the new fields and removing references to old ones
+
+This is **not** a failure — it's the correct progression of the plan. The schema is now correct; downstream consumers will be updated in order.
 
 ## Commit
 ```
-f9fe2e4 feat: add grouped checklist UI for obras_hidraulicas criterion
+a2ddd9d feat: add scope classification to CriterionModule, ProyectoData type
 ```
 
-## Self-Review Findings
-None. All implementation matches the brief exactly:
-- All 5 steps completed as specified
-- No extraneous changes
-- Template branch properly nested in existing v-if/v-else-if chain
-- CSS scoped consistently with existing rules
-- No unintended side effects on other input types (number/toggle/select)
+## Next Steps
+Ready for Task 3 (Frontend engine — evaluateScoped). The type system is now stable and type-safe for per-project evaluation logic.

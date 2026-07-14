@@ -1,153 +1,173 @@
-## Task 5: Beneficio tributario + resultados finales (TIR/VPN/Payback) + golden master
+### Task 5: UI — `CriterionCard.vue` per-project rows for scope `proyecto`
 
 **Files:**
-- Modify: `frontend/src/engine/financialEngine.ts`
-- Modify: `frontend/src/engine/__tests__/financialEngine.test.ts`
+- Modify: `frontend/src/components/CriterionCard.vue`
 
 **Interfaces:**
-- Consumes: `calcularFlujosDeCaja` (Task 4), `irr`, `npv` (Task 3).
-- Produces: `calcularFinanzas(inputs: FinancialInputs): FinancialResults` — consumida por Task 6 (`evaluatorStore`).
+- Consumes: `store.perProjectValues`, `store.proyectoNombres`, `store.perProjectResults` (Task 4), `store.setPilotesForProyecto` (Task 4), `loadCriteria()` (existing, now returns modules with `.scope`).
 
-- [ ] **Step 1: Escribir el test golden-master (falla primero)**
+- [ ] **Step 1: Remove now-invalid detail blocks referencing deleted `TerrainData` fields**
 
-Agrega a `frontend/src/engine/__tests__/financialEngine.test.ts`:
+Find the `aprovechamientoDetalle` computed (search for `result.id !== 'aprovechamiento_forestal'` in the file) and its corresponding template block (search for `result.id === 'aprovechamiento_forestal'` in the `<template>`). Delete both the computed and its template block — `aprovechamiento_forestal_detalle` no longer exists on `TerrainData`; this criterion's detail now comes from the new scope-`proyecto` row rendering added in Step 3.
+
+- [ ] **Step 2: Fix `accentColor` for scope-`proyecto` criteria**
+
+`evaluateScoped` (Task 3) always sets `value: null` on the general result for scope-`proyecto` criteria, even when real per-project data exists (there's no single representative value at the terrain level — see Task 3's rationale). Left unfixed, `accentColor`'s existing `props.result.value !== null` check would make these 6 cards always render as "empty" (gray border) even when their per-project rows have real data. Check `store.perProjectResults` instead for this branch.
+
+Find:
 
 ```ts
-import { calcularFinanzas } from '../financialEngine'
-
-describe('calcularFinanzas — golden master contra el Excel', () => {
-  const resultado = calcularFinanzas(INPUTS_EXCEL)
-
-  it('TIR ≈ 11.01%', () => {
-    expect(resultado.tir).toBeCloseTo(0.1100882832, 2)
-  })
-
-  it('TIR con beneficios tributarios ≈ 14.20%', () => {
-    expect(resultado.tirConBeneficios).toBeCloseTo(0.1420435955, 2)
-  })
-
-  it('VPN ≈ $391.8M', () => {
-    expect(resultado.vpn).toBeCloseTo(391_839_623.5, -6)
-  })
-
-  it('VPN con beneficios ≈ $1,576.1M', () => {
-    expect(resultado.vpnConBeneficios).toBeCloseTo(1_576_145_841, -6)
-  })
+const accentColor = computed(() => {
+  if (!props.result.formulaDefined) return '#ea580c'
+  if (props.result.value !== null) return 'var(--purple)'
+  return 'var(--border)'
 })
 ```
 
-- [ ] **Step 2: Correr el test para verificar que falla**
-
-```bash
-cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
-npx vitest run financialEngine
-```
-
-Expected: FAIL — `calcularFinanzas is not a function` (o similar).
-
-- [ ] **Step 3: Implementar el beneficio tributario y `calcularFinanzas`**
-
-Agrega al inicio de `financialEngine.ts`, junto al import existente de `financialData`:
+Replace with:
 
 ```ts
-import { irr, npv } from './financialMath'
-import type { FinancialResults } from '@/types'
+const accentColor = computed(() => {
+  if (!props.result.formulaDefined) return '#ea580c'
+  if (module.value?.scope === 'proyecto') {
+    const results = store.perProjectResults
+    const tieneDatos = store.proyectoNombres.some(
+      nombre => results[nombre]?.find(r => r.id === props.result.id)?.value !== null,
+    )
+    return tieneDatos ? 'var(--purple)' : 'var(--border)'
+  }
+  if (props.result.value !== null) return 'var(--purple)'
+  return 'var(--border)'
+})
 ```
 
-Y agrega al final del archivo (después de `calcularFlujosDeCaja`):
+- [ ] **Step 3: Add per-project computeds and handlers**
+
+Find the `checklistItem` function and the block right after it (the `checklistGroups` computed, ending right before `function handleChecklistToggle`). Immediately after `checklistGroups`'s closing `})`, insert:
 
 ```ts
-const DEPRECIACION_ANIOS = 15
-const TASA_IMPUESTO_RENTA = 0.35
-const TASA_DESCUENTO_VPN = 0.10
 
-function calcularBeneficioTributario(capex: number): number[] {
-  const beneficio: number[] = new Array(N_PERIODOS).fill(0)
-  const depreciacionAnual = capex / DEPRECIACION_ANIOS
-  const depreciacionAceleradaAnual = (capex * 0.5) / DEPRECIACION_ANIOS
+const isProyectoScope = computed(() => module.value?.scope === 'proyecto')
 
-  for (let k = 1; k < N_PERIODOS; k++) {
-    const anio = AÑO_BASE + k
-    let total = 0
-    // Depreciación línea recta (años base+1 .. base+15)
-    if (anio < AÑO_BASE + 1 + DEPRECIACION_ANIOS) {
-      total += depreciacionAnual * TASA_IMPUESTO_RENTA
+const proyectoRows = computed(() => {
+  if (!isProyectoScope.value) return []
+  const results = store.perProjectResults
+  return store.proyectoNombres.map(nombre => {
+    const result = results[nombre]?.find(r => r.id === props.result.id)
+    return {
+      nombre,
+      value: result?.value ?? null,
+      sobrecosto: result?.sobrecosto ?? 0,
     }
-    // Depreciación acelerada sobre 50% del capex, desplazada 1 año (años base+2 .. base+16)
-    if (anio - 1 < AÑO_BASE + 1 + DEPRECIACION_ANIOS && k >= 2) {
-      total += depreciacionAceleradaAnual * TASA_IMPUESTO_RENTA
-    }
-    beneficio[k] = total
-  }
-  return beneficio
-}
+  })
+})
 
-function calcularPayback(flujos: number[]): number {
-  // Replica el conteo del Excel (filas 45-47): el año de inversión (índice 0) siempre
-  // contribuye 1 año completo; los años siguientes contribuyen 1 si aún no se recupera
-  // la inversión, una fracción en el año que cruza a positivo, y 0 después.
-  let contador = 1
-  let remanente = -flujos[0]
-  for (let k = 1; k < flujos.length; k++) {
-    if (remanente <= 0) continue
-    const remanenteAnterior = remanente
-    remanente = remanente - flujos[k]
-    if (remanente > 0) {
-      contador += 1
-    } else {
-      contador += remanenteAnterior / flujos[k]
-    }
-  }
-  return contador
-}
+const proyectoTotal = computed(() => proyectoRows.value.reduce((acc, row) => acc + row.sobrecosto, 0))
 
-export function calcularFinanzas(inputs: FinancialInputs): FinancialResults {
-  const { flujoInversionista } = calcularFlujosDeCaja(inputs)
-  const beneficioTributario = calcularBeneficioTributario(inputs.capex)
-  const flujoInversionistaConBeneficios = flujoInversionista.map((f, i) => f + beneficioTributario[i])
-
-  // NPV Excel: NPV(10%, años 1..31) + flujo año 0 (columnas D:AH del Excel = índices 1..31)
-  const vpn = flujoInversionista[0] + npv(TASA_DESCUENTO_VPN, flujoInversionista.slice(1, 32))
-  const vpnConBeneficios =
-    flujoInversionistaConBeneficios[0] + npv(TASA_DESCUENTO_VPN, flujoInversionistaConBeneficios.slice(1, 32))
-
-  return {
-    tir: irr(flujoInversionista),
-    tirConBeneficios: irr(flujoInversionistaConBeneficios),
-    vpn,
-    vpnConBeneficios,
-    paybackAnios: calcularPayback(flujoInversionista),
-    paybackConBeneficiosAnios: calcularPayback(flujoInversionistaConBeneficios),
-  }
+function handlePilotesToggle(nombre: string, event: Event) {
+  const target = event.target as HTMLInputElement
+  store.setPilotesForProyecto(nombre, target.checked)
 }
 ```
 
-- [ ] **Step 4: Correr el test — iterar hasta que pase**
+- [ ] **Step 4: Add the per-project template branch**
 
-```bash
-cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
-npx vitest run financialEngine
+Find the `.card-input` closing `</div>` (the one right after the `checklist` `v-else-if` template block ends). Immediately before that closing `</div>`, insert a new `v-else-if` branch:
+
+```html
+      <template v-else-if="isProyectoScope && result.id !== 'pilotes'">
+        <div class="proyecto-rows">
+          <div v-for="row in proyectoRows" :key="row.nombre" class="proyecto-row">
+            <span class="proyecto-row-nombre">{{ row.nombre }}</span>
+            <span class="proyecto-row-valor">{{ row.value ?? '—' }}{{ module?.unit ? ` ${module.unit}` : '' }}</span>
+            <span class="proyecto-row-sobrecosto">{{ formatCOP(row.sobrecosto) }}</span>
+          </div>
+          <div class="proyecto-row proyecto-row--total">
+            <span class="proyecto-row-nombre">Total</span>
+            <span class="proyecto-row-sobrecosto">{{ formatCOP(proyectoTotal) }}</span>
+          </div>
+        </div>
+      </template>
+
+      <template v-else-if="isProyectoScope && result.id === 'pilotes'">
+        <div class="proyecto-rows">
+          <div v-for="nombre in store.proyectoNombres" :key="nombre" class="proyecto-row">
+            <label class="toggle-label">
+              <input
+                type="checkbox"
+                :checked="store.perProjectValues.pilotes?.[nombre] === true"
+                class="toggle-checkbox"
+                @change="handlePilotesToggle(nombre, $event)"
+              />
+              <span>{{ nombre }}</span>
+            </label>
+          </div>
+        </div>
+      </template>
 ```
 
-Expected: todos los tests pasan. Si TIR/VPN no coinciden dentro de tolerancia, depurar comparando flujo por flujo contra la hoja "Flujo de caja" del Excel original (`Retail Modelo financiero - Plantilla Evaluador.xlsx`) fila 38 (sin beneficios) y fila 43 (con beneficios) — no contra el payback, que es el resultado más sensible a la convención exacta de fracción-de-año del Excel y puede quedar aproximado (ver Nota abajo).
+- [ ] **Step 5: Hide the generic bottom cost row for scope-`proyecto` criteria**
 
-**Nota sobre Payback:** El deliverable principal pedido por el usuario es la TIR; VPN es el segundo más importante. Si el payback no cuadra exactamente con el Excel (9 y 7 años) después de intentar la implementación de arriba, es aceptable dejarlo con una tolerancia más amplia (±1 año) y anotarlo como conocido en el commit — no bloquear la entrega de TIR/VPN por esto.
+Find the `<!-- Criterio fijo: muestra COP -->` template block (the `<div class="card-cost" v-if="result.formulaDefined && result.category !== 'probabilidad'">`). Change its `v-if` to also exclude scope-`proyecto` criteria (their own total is already shown inside `proyecto-rows` from Step 3):
 
-- [ ] **Step 5: Correr toda la suite de frontend**
+Find:
 
-```bash
-cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance\frontend"
-npx vitest run
+```html
+    <div class="card-cost" v-if="result.formulaDefined && result.category !== 'probabilidad'">
 ```
 
-Expected: todos los tests pasan (los existentes + los nuevos de esta task).
+Replace with:
 
-- [ ] **Step 6: Commit**
+```html
+    <div class="card-cost" v-if="result.formulaDefined && result.category !== 'probabilidad' && !isProyectoScope">
+```
+
+- [ ] **Step 6: Add CSS for the per-project rows**
+
+Find the closing `</style>` tag. Immediately before it, insert:
+
+```css
+
+.proyecto-rows { display: flex; flex-direction: column; gap: 0.4rem; width: 100%; }
+.proyecto-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+}
+.proyecto-row-nombre { color: var(--text-mid); flex: 1; }
+.proyecto-row-valor { color: var(--text); font-weight: 600; white-space: nowrap; }
+.proyecto-row-sobrecosto { color: var(--purple); font-weight: 700; white-space: nowrap; }
+.proyecto-row--total {
+  border-top: 1px dashed var(--border);
+  padding-top: 0.4rem;
+  margin-top: 0.2rem;
+  font-weight: 700;
+}
+```
+
+- [ ] **Step 7: Type-check**
+
+Run (from `frontend/`): `npx vue-tsc -b`
+
+Expected: exactly the 2 pre-existing errors — no new errors in `CriterionCard.vue`.
+
+- [ ] **Step 8: Manual verification against the running dev server**
+
+This repo has no automated tests for `.vue` components (see prior features' plans) and no browser-automation tool is available — verify by code trace and, if you have a live browser available to you, by driving the app; otherwise state plainly in your report that this step needs human verification.
+
+1. Restart backend + frontend dev servers if not already running.
+2. Search terrain `COLSANT5` (2 projects).
+3. Confirm the "Número de árboles" card shows two rows (P1: 2 árboles, P2: 0 árboles) each with its own sobrecosto, plus a Total row.
+4. Confirm "Pilotes" card shows two checkboxes (one per project name) instead of a single toggle.
+5. Confirm "Corte"/"Lleno" cards are UNCHANGED (single input, single sobrecosto — scope `terreno_dividido` criteria don't touch `CriterionCard.vue` in this task).
+
+- [ ] **Step 9: Commit**
 
 ```bash
-cd "C:\Users\EQUIPO\Documents\Claude\evaluador-advance"
-git add frontend/src/engine/financialEngine.ts frontend/src/engine/__tests__/financialEngine.test.ts
-git commit -m "feat: add tax benefit calculation and TIR/VPN/Payback outputs"
+git add frontend/src/components/CriterionCard.vue
+git commit -m "feat: render per-project rows for scope-proyecto criteria in CriterionCard"
 ```
 
 ---
