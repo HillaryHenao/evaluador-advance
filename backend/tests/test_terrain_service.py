@@ -37,19 +37,22 @@ def test_resolve_aprovechamiento_nivel_vacio():
 
 def test_get_proyectos_activos_devuelve_datos_por_proyecto():
     # COLSANT5: P1 en visita con 2 árboles, P2 exonerado con 0 árboles — cada uno con su
-    # propio dato, sin funnel a un valor compartido del terreno.
+    # propio dato, sin funnel a un valor compartido del terreno. Cada uno también trae su
+    # propio arriendo_anual (independiente, no se divide ni se comparte entre proyectos).
     rows = [
         {
             'nombre': 'COLSANT5P1_GIRON_SUR',
             'distancia_via': 10.0, 'distancia_red': 30.0,
             'tipo_raw': '1P TRACKER', 'numero_arboles_raw': '2',
             'aprov_value': 'Visita', 'aprov_status': 'pending',
+            'arriendo_anual': 12_000_000.0,
         },
         {
             'nombre': 'COLSANT5P2_GIRON_SUR',
             'distancia_via': 12.0, 'distancia_red': 28.0,
             'tipo_raw': 'MESA FIJA', 'numero_arboles_raw': '0',
             'aprov_value': None, 'aprov_status': 'exonerated',
+            'arriendo_anual': 8_000_000.0,
         },
     ]
     with patch.object(terrain_service, '_connect', return_value=_mock_conn(rows)):
@@ -59,10 +62,12 @@ def test_get_proyectos_activos_devuelve_datos_por_proyecto():
         {
             'nombre': 'COLSANT5P1_GIRON_SUR', 'distancia_via': 10.0, 'distancia_red': 30.0,
             'tipo_estructura': 'tracker', 'numero_arboles': 2, 'aprovechamiento_forestal': 'visita',
+            'arriendo_anual': 12_000_000.0,
         },
         {
             'nombre': 'COLSANT5P2_GIRON_SUR', 'distancia_via': 12.0, 'distancia_red': 28.0,
             'tipo_estructura': 'mesa_fija', 'numero_arboles': 0, 'aprovechamiento_forestal': None,
+            'arriendo_anual': 8_000_000.0,
         },
     ]
 
@@ -79,12 +84,14 @@ def test_get_proyectos_activos_arboles_cero_cuando_forestal_resuelto_sin_dato():
             'distancia_via': 20.0, 'distancia_red': 190.0,
             'tipo_raw': '1P TRACKER', 'numero_arboles_raw': None,
             'aprov_value': 'Exonerado', 'aprov_status': 'pending',
+            'arriendo_anual': 5_000_000.0,
         },
         {
             'nombre': 'COLBOYT147P2_TUNJA_OCCIDENTE',
             'distancia_via': 20.0, 'distancia_red': 190.0,
             'tipo_raw': '1P TRACKER', 'numero_arboles_raw': None,
             'aprov_value': 'Visita', 'aprov_status': 'pending',
+            'arriendo_anual': 3_000_000.0,
         },
     ]
     with patch.object(terrain_service, '_connect', return_value=_mock_conn(rows)):

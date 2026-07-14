@@ -331,7 +331,11 @@ def _get_proyectos_activos(terrain_id: int) -> list[dict]:
                            WHERE vf.project_id = p.id
                              AND vf.name = 'Licencia de aprovechamiento forestal'
                            ORDER BY vf.id DESC LIMIT 1
-                       )                                           AS aprov_status
+                       )                                           AS aprov_status,
+                       (
+                           SELECT ts.rent_annual_cost_cop FROM termsheet_termsheet ts
+                           WHERE ts.id = p.termsheet_id
+                       )                                           AS arriendo_anual
                    FROM minifarm_project p
                    WHERE p.terrain_id = %s
                      AND p.stage NOT IN ('dead', 'paused', 'uci')
@@ -375,6 +379,7 @@ def _get_proyectos_activos(terrain_id: int) -> list[dict]:
             'tipo_estructura': tipo_estructura,
             'numero_arboles': numero_arboles,
             'aprovechamiento_forestal': _resolve_aprovechamiento_nivel(aprov_raw),
+            'arriendo_anual': r['arriendo_anual'],
         })
     return proyectos
 
@@ -400,9 +405,11 @@ def get_terrain_data(code: str) -> Optional[dict]:
                           AND mp2.stage NOT IN ('dead', 'paused', 'uci')
                     )                                           AS cluster,
                     (
-                        SELECT ts.rent_annual_cost_cop
-                        FROM termsheet_termsheet ts
-                        WHERE ts.id = p.termsheet_id
+                        SELECT SUM(ts.rent_annual_cost_cop)
+                        FROM minifarm_project mp3
+                        JOIN termsheet_termsheet ts ON ts.id = mp3.termsheet_id
+                        WHERE mp3.terrain_id = t.id
+                          AND mp3.stage NOT IN ('dead', 'paused', 'uci')
                     )                                           AS arriendo_anual
 
                 FROM termsheet_terrain t
