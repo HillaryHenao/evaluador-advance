@@ -5,15 +5,12 @@ import TerrainSearch from '@/components/TerrainSearch.vue'
 import CriterionCard from '@/components/CriterionCard.vue'
 import SummaryPanel from '@/components/SummaryPanel.vue'
 import FinancialResultsPanel from '@/components/FinancialResultsPanel.vue'
+import ProjectBreakdownPanel from '@/components/ProjectBreakdownPanel.vue'
 import { useEvaluatorStore } from '@/stores/evaluatorStore'
-import { evaluateCriteria } from '@/engine/evaluatorEngine'
 
 const store = useEvaluatorStore()
 
-const results = computed(() => evaluateCriteria(store.criterionValues, {
-  baseCapex: store.baseCapex,
-  kWp: store.kWp,
-}))
+const results = computed(() => store.aggregated.breakdown)
 
 const FIJO_ORDER = [
   'distancia_red', 'distancia_via',
@@ -65,6 +62,8 @@ const probabilidadResults = computed(() =>
               />
             </div>
           </section>
+
+          <ProjectBreakdownPanel />
         </div>
       </main>
       <SummaryPanel />
