@@ -7,6 +7,7 @@ export interface ProyectoData {
   aprovechamiento_forestal: string | null
   numero_arboles: number | null
   tipo_estructura: string | null
+  arriendo_anual: number | null
 }
 
 export interface ObraHidraulicaItem {

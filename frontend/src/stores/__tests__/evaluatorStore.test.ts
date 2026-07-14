@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useEvaluatorStore } from '../evaluatorStore'
 import * as terrainService from '@/services/terrainService'
+import { calcularFinanzas } from '@/engine/financialEngine'
 import type { TerrainData } from '@/types'
 
 const mockTerrain: TerrainData = {
@@ -20,7 +21,7 @@ const mockTerrain: TerrainData = {
   produccion_especifica: 4.5287,
   arriendo_anual: 26275000,
   proyectos: [
-    { nombre: 'Test Proyecto', distancia_via: 120, distancia_red: 350, aprovechamiento_forestal: null, numero_arboles: 5, tipo_estructura: 'Tracker' },
+    { nombre: 'Test Proyecto', distancia_via: 120, distancia_red: 350, aprovechamiento_forestal: null, numero_arboles: 5, tipo_estructura: 'Tracker', arriendo_anual: 26275000 },
   ],
 }
 
@@ -82,8 +83,8 @@ describe('perProjectValues y perProjectResults', () => {
       coexistencias: false, coexistencias_detalle: [],
       produccion_especifica: 4.5, arriendo_anual: 20_000_000,
       proyectos: [
-        { nombre: 'P1', distancia_via: 10, distancia_red: 30, aprovechamiento_forestal: 'visita', numero_arboles: 2, tipo_estructura: 'tracker' },
-        { nombre: 'P2', distancia_via: 12, distancia_red: 28, aprovechamiento_forestal: null, numero_arboles: 0, tipo_estructura: 'mesa_fija' },
+        { nombre: 'P1', distancia_via: 10, distancia_red: 30, aprovechamiento_forestal: 'visita', numero_arboles: 2, tipo_estructura: 'tracker', arriendo_anual: 12_000_000 },
+        { nombre: 'P2', distancia_via: 12, distancia_red: 28, aprovechamiento_forestal: null, numero_arboles: 0, tipo_estructura: 'mesa_fija', arriendo_anual: 8_000_000 },
       ],
     })
     await store.fetchTerrain('COLSANT5')
@@ -109,8 +110,8 @@ describe('perProjectValues y perProjectResults', () => {
       coexistencias: false, coexistencias_detalle: [],
       produccion_especifica: 4.5, arriendo_anual: 20_000_000,
       proyectos: [
-        { nombre: 'P1', distancia_via: 10, distancia_red: 30, aprovechamiento_forestal: null, numero_arboles: 0, tipo_estructura: 'tracker' },
-        { nombre: 'P2', distancia_via: 12, distancia_red: 28, aprovechamiento_forestal: null, numero_arboles: 0, tipo_estructura: 'mesa_fija' },
+        { nombre: 'P1', distancia_via: 10, distancia_red: 30, aprovechamiento_forestal: null, numero_arboles: 0, tipo_estructura: 'tracker', arriendo_anual: 12_000_000 },
+        { nombre: 'P2', distancia_via: 12, distancia_red: 28, aprovechamiento_forestal: null, numero_arboles: 0, tipo_estructura: 'mesa_fija', arriendo_anual: 8_000_000 },
       ],
     })
     await store.fetchTerrain('COLSANT5')
@@ -122,7 +123,46 @@ describe('perProjectValues y perProjectResults', () => {
 })
 
 describe('perProjectFinancials', () => {
-  it('divide capex, kWp, kVA y arriendo entre N proyectos para el VPN', async () => {
+  it('cada proyecto usa su propio capex/kWp/kVA/arriendo COMPLETOS, sin dividir entre N', async () => {
+    const store = useEvaluatorStore()
+    vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue({
+      code: 'COLSANT5', name: 'Test', municipality: 'Giron', or: 'ESSA',
+      nivel_tension: '13.8kV', cluster: 2,
+      ocupacion_cauce: false, ocupacion_cauce_detalle: 'No Requiere',
+      servidumbre: 0, servidumbre_detalle: null,
+      coexistencias: false, coexistencias_detalle: [],
+      produccion_especifica: 4.5, arriendo_anual: 20_000_000,
+      // Sin datos de scope 'proyecto' (todo null) para que el subtotal de sobrecostos
+      // fijos de cada proyecto sea 0 y el capex de cada uno sea exactamente store.baseCapex
+      // — así el test puede verificar el valor exacto sin recalcular fórmulas de criterios.
+      proyectos: [
+        { nombre: 'P1', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 12_000_000 },
+        { nombre: 'P2', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 8_000_000 },
+      ],
+    })
+    await store.fetchTerrain('COLSANT5')
+
+    expect(store.perProjectFinancials).not.toBeNull()
+
+    const esperadoP1 = calcularFinanzas({
+      capex: store.baseCapex, kWp: store.kWp, kVA: store.kVA,
+      produccionEspecifica: 4.5, arriendoAnual: 12_000_000,
+    })
+    const esperadoP2 = calcularFinanzas({
+      capex: store.baseCapex, kWp: store.kWp, kVA: store.kVA,
+      produccionEspecifica: 4.5, arriendoAnual: 8_000_000,
+    })
+
+    expect(store.perProjectFinancials!['P1'].vpn).toBeCloseTo(esperadoP1.vpn, 6)
+    expect(store.perProjectFinancials!['P2'].vpn).toBeCloseTo(esperadoP2.vpn, 6)
+    // P1 y P2 tienen arriendo distinto (12M vs 8M) y NADA se divide entre ellos — por eso
+    // sus VPN deben diferir. Bajo el modelo anterior (dividir por N) ambos habrían recibido
+    // el mismo arriendo compartido y habrían dado resultados idénticos; este test falla si
+    // alguien reintroduce esa división.
+    expect(store.perProjectFinancials!['P1'].vpn).not.toBe(store.perProjectFinancials!['P2'].vpn)
+  })
+
+  it('general (financialResults) multiplica kWp y kVA por N, no los deja sin escalar', async () => {
     const store = useEvaluatorStore()
     vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue({
       code: 'COLSANT5', name: 'Test', municipality: 'Giron', or: 'ESSA',
@@ -132,26 +172,20 @@ describe('perProjectFinancials', () => {
       coexistencias: false, coexistencias_detalle: [],
       produccion_especifica: 4.5, arriendo_anual: 20_000_000,
       proyectos: [
-        { nombre: 'P1', distancia_via: 10, distancia_red: 30, aprovechamiento_forestal: null, numero_arboles: 0, tipo_estructura: 'tracker' },
-        { nombre: 'P2', distancia_via: 12, distancia_red: 28, aprovechamiento_forestal: null, numero_arboles: 0, tipo_estructura: 'mesa_fija' },
+        { nombre: 'P1', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 12_000_000 },
+        { nombre: 'P2', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 8_000_000 },
       ],
     })
     await store.fetchTerrain('COLSANT5')
 
-    expect(store.perProjectFinancials).not.toBeNull()
-    const p1 = store.perProjectFinancials!['P1'].vpn
-    const p2 = store.perProjectFinancials!['P2'].vpn
-    // Ambos proyectos reciben la misma división (N=2) con datos simétricos, así que
-    // deben coincidir exactamente entre sí.
-    expect(p1).toBe(p2)
-    // No se espera igualdad exacta con financialResults.vpn / 2: calcularFinanzas() incluye
-    // costos absolutos que NO escalan con capex/kWp/kVA (servicios públicos, mantenimiento
-    // de tracker, reemplazo de inversores — ver financialEngine.ts). Al dividir un terreno
-    // en N proyectos esos costos fijos se pagan N veces en vez de dividirse entre N, así que
-    // el VPN por proyecto queda por debajo de (vpn total / N), no exactamente en la mitad.
-    // Se verifica un rango razonable en lugar de una igualdad exacta.
-    const mitad = store.financialResults!.vpn / 2
-    expect(p1).toBeGreaterThan(mitad * 0.5)
-    expect(p1).toBeLessThan(mitad)
+    const esperado = calcularFinanzas({
+      capex: store.aggregated.capexTotal,
+      kWp: store.kWp * 2,
+      kVA: store.kVA * 2,
+      produccionEspecifica: 4.5,
+      arriendoAnual: 20_000_000,
+    })
+
+    expect(store.financialResults!.vpn).toBeCloseTo(esperado.vpn, 6)
   })
 })

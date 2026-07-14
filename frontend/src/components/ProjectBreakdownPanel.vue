@@ -41,7 +41,7 @@ const proyectos = computed(() => {
     const riesgoItems = aggregated.breakdown.filter(
       r => r.category === 'probabilidad' && r.formulaDefined && r.sobrecosto > 0,
     )
-    const capexBase = store.baseCapex / n
+    const capexBase = store.baseCapex
     return {
       nombre,
       fijoItems,

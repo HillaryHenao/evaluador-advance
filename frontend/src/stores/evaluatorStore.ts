@@ -27,7 +27,14 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
   const proyectoNombres = computed(() => terrainData.value?.proyectos.map(p => p.nombre) ?? [])
   const projectCount = computed(() => Math.max(proyectoNombres.value.length, 1))
 
-  const context = computed(() => ({ baseCapex: baseCapex.value, kWp: kWp.value, projectCount: projectCount.value }))
+  // baseCapex y kWp son magnitudes POR PROYECTO (cada proyecto construye su propia
+  // instalación completa) — el contexto general las multiplica por N en vez de usarlas
+  // tal cual, para que aggregateCosts sume correctamente el capex de los N proyectos.
+  const context = computed(() => ({
+    baseCapex: baseCapex.value * projectCount.value,
+    kWp: kWp.value * projectCount.value,
+    projectCount: projectCount.value,
+  }))
 
   const scopedEvaluation = computed(() => {
     return evaluateScoped(criterionValues.value, perProjectValues.value, proyectoNombres.value, context.value)
@@ -47,8 +54,8 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
     if (!produccionEspecifica || !arriendoAnual) return null
     return calcularFinanzas({
       capex: aggregated.value.capexTotal,
-      kWp: kWp.value,
-      kVA: kVA.value,
+      kWp: kWp.value * projectCount.value,
+      kVA: kVA.value * projectCount.value,
       produccionEspecifica,
       arriendoAnual,
     })
@@ -56,26 +63,33 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
 
   const perProjectFinancials = computed<Record<string, { vpn: number; vpnConBeneficios: number }> | null>(() => {
     const produccionEspecifica = terrainData.value?.produccion_especifica
-    const arriendoAnual = arriendoManual.value ?? terrainData.value?.arriendo_anual
-    if (!produccionEspecifica || !arriendoAnual) return null
-    const n = projectCount.value
-    // Divide el CAPEX GENERAL ya agregado (no reconstruir desde perProjectResults —
-    // eso ya divide los criterios terreno_dividido dentro de evaluateScoped; volver
-    // a dividir aquí dividiría dos veces esa porción, y baseCapex quedaría sin dividir).
-    const capexPorProyecto = aggregated.value.capexTotal / n
+    if (!produccionEspecifica) return null
 
     const resultado: Record<string, { vpn: number; vpnConBeneficios: number }> = {}
-    for (const nombre of proyectoNombres.value) {
+    for (const proyecto of terrainData.value?.proyectos ?? []) {
+      const arriendoProyecto = proyecto.arriendo_anual
+      if (!arriendoProyecto) continue
+
+      // baseCapex/kWp/kVA son magnitudes POR PROYECTO — cada proyecto usa el valor
+      // completo, sin dividir. Solo se le suma el subtotal de sobrecostos fijos propio
+      // de ESE proyecto (perProjectResults ya trae los criterios terreno_dividido
+      // divididos entre N y los de scope proyecto con el valor propio — ver
+      // evaluateScoped en evaluatorEngine.ts).
+      const results = perProjectResults.value[proyecto.nombre] ?? []
+      const capexProyecto = baseCapex.value + aggregateCosts(results, {
+        baseCapex: baseCapex.value, kWp: kWp.value, projectCount: 1,
+      }).totalSobrecostoFijo
+
       const finanzas = calcularFinanzas({
-        capex: capexPorProyecto,
-        kWp: kWp.value / n,
-        kVA: kVA.value / n,
+        capex: capexProyecto,
+        kWp: kWp.value,
+        kVA: kVA.value,
         produccionEspecifica,
-        arriendoAnual: arriendoAnual / n,
+        arriendoAnual: arriendoProyecto,
       })
-      resultado[nombre] = { vpn: finanzas.vpn, vpnConBeneficios: finanzas.vpnConBeneficios }
+      resultado[proyecto.nombre] = { vpn: finanzas.vpn, vpnConBeneficios: finanzas.vpnConBeneficios }
     }
-    return resultado
+    return Object.keys(resultado).length > 0 ? resultado : null
   })
 
   async function fetchTerrain(code: string): Promise<void> {
