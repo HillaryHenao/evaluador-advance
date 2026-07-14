@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useAuthStore } from '../authStore'
 import * as authService from '@/services/authService'
@@ -17,8 +17,16 @@ const mockTokens = {
 }
 
 beforeEach(() => {
+  // El desarrollador puede tener VITE_SKIP_AUTH=true en su .env.local (gitignored) para
+  // saltar el login localmente — el store debe testearse siempre con la bandera en false,
+  // sin importar el entorno de quien corra la suite.
+  vi.stubEnv('VITE_SKIP_AUTH', 'false')
   setActivePinia(createPinia())
   localStorage.clear()
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
 })
 
 describe('useAuthStore', () => {

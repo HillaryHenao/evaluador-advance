@@ -7,7 +7,7 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUser | null>(null)
   const accessToken = ref<string | null>(localStorage.getItem('access_token'))
 
-  const skipAuth = import.meta.env.VITE_SKIP_AUTH === 'true'
+  const skipAuth = import.meta.env.DEV && import.meta.env.VITE_SKIP_AUTH === 'true'
   const isAuthenticated = computed(() => skipAuth || (accessToken.value !== null && user.value !== null))
 
   async function login(username: string, password: string): Promise<void> {
