@@ -8,6 +8,7 @@ const lleno: CriterionModule = {
   dataSource: 'manual',
   formulaDefined: true,
   category: 'fijo',
+  scope: 'terreno_dividido',
   computeCost(value: CriterionValue, _context: EvalContext): number {
     if (value === null || typeof value !== 'number') return 0
     return value * 210_000

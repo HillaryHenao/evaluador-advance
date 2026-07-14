@@ -13,6 +13,7 @@ const nivelTension: CriterionModule = {
   ],
   formulaDefined: true,
   category: 'fijo',
+  scope: 'terreno_multiplicado',
   computeCost(value: CriterionValue, _context: EvalContext): number {
     return value === '34.5kV' ? 30_000_000 : 0
   },

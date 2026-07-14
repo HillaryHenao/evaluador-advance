@@ -9,6 +9,7 @@ const numeroArboles: CriterionModule = {
   dbField: 'numero_arboles',
   formulaDefined: true,
   category: 'fijo',
+  scope: 'proyecto',
   computeCost(value: CriterionValue, _context: EvalContext): number {
     if (value === null || typeof value !== 'number') return 0
     return value * 142_500

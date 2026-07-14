@@ -17,6 +17,7 @@ const distanciaRed: CriterionModule = {
   dbField: 'distancia_red',
   formulaDefined: true,
   category: 'fijo',
+  scope: 'proyecto',
   computeCost(value: CriterionValue, _context: EvalContext): number {
     if (value === null || typeof value !== 'number' || value <= 0) return 0
     return value * tieredCostPerMeter(value)

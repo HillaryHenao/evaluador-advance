@@ -13,6 +13,7 @@ const aprovechamientoForestal: CriterionModule = {
   ],
   formulaDefined: true,
   category: 'fijo',
+  scope: 'proyecto',
   computeCost(value: CriterionValue, _context: EvalContext): number {
     if (value === 'visita') return 20_000_000
     if (value === 'radicada') return 150_000_000

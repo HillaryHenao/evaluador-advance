@@ -8,6 +8,7 @@ const ocupacionCauce: CriterionModule = {
   dbField: 'ocupacion_cauce',
   formulaDefined: true,
   category: 'fijo',
+  scope: 'terreno_dividido',
   computeCost(value: CriterionValue, _context: EvalContext): number {
     if (value !== true) return 0
     return 100_000_000

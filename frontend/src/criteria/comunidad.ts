@@ -12,6 +12,7 @@ const comunidad: CriterionModule = {
   ],
   formulaDefined: false,
   category: 'probabilidad',
+  scope: 'terreno_dividido',
   computeCost(_value: CriterionValue, _context: EvalContext): number {
     return 0
   },

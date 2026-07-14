@@ -12,6 +12,7 @@ const tipoEstructura: CriterionModule = {
   ],
   formulaDefined: false,
   category: 'probabilidad',
+  scope: 'proyecto',
   computeCost(_value: CriterionValue, _context: EvalContext): number {
     return 0
   },

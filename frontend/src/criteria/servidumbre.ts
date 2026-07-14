@@ -11,6 +11,7 @@ const servidumbre: CriterionModule = {
   formulaDefined: true,
   category: 'probabilidad',
   riskType: 'meses',
+  scope: 'terreno_dividido',
   computeCost(value: CriterionValue, _context: EvalContext): number {
     if (value === null || typeof value !== 'number' || value <= 0) return 0
     return value * COSTO_POR_MES

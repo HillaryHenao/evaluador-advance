@@ -7,6 +7,7 @@ const pilotes: CriterionModule = {
   dataSource: 'manual',
   formulaDefined: true,
   category: 'fijo',
+  scope: 'proyecto',
   computeCost(value: CriterionValue, _context: EvalContext): number {
     if (value !== true) return 0
     return 156_000_000

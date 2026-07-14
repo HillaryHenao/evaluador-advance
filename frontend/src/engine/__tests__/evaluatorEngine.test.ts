@@ -25,6 +25,14 @@ describe('loadCriteria', () => {
       expect(['number', 'toggle', 'select', 'checklist']).toContain(c.inputType)
     }
   })
+
+  it('todos tienen un scope válido', () => {
+    const criteria = loadCriteria()
+    const validScopes = ['proyecto', 'terreno_dividido', 'terreno_multiplicado', 'terreno_no_dividido']
+    for (const c of criteria) {
+      expect(validScopes).toContain(c.scope)
+    }
+  })
 })
 
 describe('evaluateCriteria', () => {

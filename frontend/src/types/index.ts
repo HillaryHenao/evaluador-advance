@@ -1,3 +1,14 @@
+export type CriterionScope = 'proyecto' | 'terreno_dividido' | 'terreno_multiplicado' | 'terreno_no_dividido'
+
+export interface ProyectoData {
+  nombre: string
+  distancia_via: number | null
+  distancia_red: number | null
+  aprovechamiento_forestal: string | null
+  numero_arboles: number | null
+  tipo_estructura: string | null
+}
+
 export interface ObraHidraulicaItem {
   activo: boolean
   cantidad: number | null
@@ -15,6 +26,7 @@ export type CriterionValue = number | boolean | string | null | ObrasHidraulicas
 export interface EvalContext {
   baseCapex: number
   kWp: number
+  projectCount?: number
 }
 
 export type CriterionCategory = 'fijo' | 'probabilidad' | 'ambas'
@@ -70,6 +82,7 @@ export interface CriterionModule {
   formulaDefined: boolean
   category: CriterionCategory
   riskType?: RiskType
+  scope: CriterionScope
   checklistItems?: ChecklistItemDef[]
   computeCost: (value: CriterionValue, context: EvalContext) => number
 }
@@ -78,32 +91,22 @@ export interface TerrainData {
   code: string
   name: string
   municipality: string
-  distancia_via: number | null
-  distancia_red: number | null
   or: string | null
   nivel_tension: string | null
   cluster: number | null
-  tipo_estructura: string | null
   ocupacion_cauce: boolean | null
   ocupacion_cauce_detalle: string | null
   servidumbre: number | null
   servidumbre_detalle: EstadoDetalle | null
-  aprovechamiento_forestal: string | null
-  aprovechamiento_forestal_detalle: ProyectoEstadoDetalle[] | null
   coexistencias: boolean | null
   coexistencias_detalle: CoexistenciaDetalle[] | null
-  numero_arboles: number | null
   produccion_especifica: number | null
   arriendo_anual: number | null
+  proyectos: ProyectoData[]
 }
 
 export interface CoexistenciaDetalle {
   entidad: string
-  estado: string
-}
-
-export interface ProyectoEstadoDetalle {
-  proyecto: string
   estado: string
 }
 

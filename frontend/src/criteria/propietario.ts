@@ -13,6 +13,7 @@ const propietario: CriterionModule = {
   formulaDefined: true,
   category: 'probabilidad',
   riskType: 'costo',
+  scope: 'terreno_dividido',
   computeCost(value: CriterionValue, _context: EvalContext): number {
     if (value === 'medio') return 30_000_000
     if (value === 'malo') return 60_000_000

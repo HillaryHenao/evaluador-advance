@@ -9,6 +9,7 @@ const cluster: CriterionModule = {
   dbField: 'cluster',
   formulaDefined: true,
   category: 'fijo',
+  scope: 'terreno_no_dividido',
   computeCost(value: CriterionValue, _context: EvalContext): number {
     if (value === null || typeof value !== 'number') return 0
     if (value > 2) return -30_000_000

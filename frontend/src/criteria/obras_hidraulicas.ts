@@ -14,6 +14,7 @@ const obrasHidraulicas: CriterionModule = {
   dataSource: 'manual',
   formulaDefined: true,
   category: 'fijo',
+  scope: 'terreno_dividido',
   checklistItems: ITEMS,
   computeCost(value: CriterionValue, _context: EvalContext): number {
     if (!value || typeof value !== 'object') return 0
