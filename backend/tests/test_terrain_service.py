@@ -62,11 +62,13 @@ def test_get_proyectos_activos_devuelve_datos_por_proyecto():
         {
             'nombre': 'COLSANT5P1_GIRON_SUR', 'distancia_via': 10.0, 'distancia_red': 30.0,
             'tipo_estructura': 'tracker', 'numero_arboles': 2, 'aprovechamiento_forestal': 'visita',
+            'aprovechamiento_forestal_detalle': 'Visita',
             'arriendo_anual': 12_000_000.0,
         },
         {
             'nombre': 'COLSANT5P2_GIRON_SUR', 'distancia_via': 12.0, 'distancia_red': 28.0,
             'tipo_estructura': 'mesa_fija', 'numero_arboles': 0, 'aprovechamiento_forestal': None,
+            'aprovechamiento_forestal_detalle': 'Exonerado',
             'arriendo_anual': 8_000_000.0,
         },
     ]
@@ -99,8 +101,10 @@ def test_get_proyectos_activos_arboles_cero_cuando_forestal_resuelto_sin_dato():
 
     assert proyectos[0]['numero_arboles'] == 0
     assert proyectos[0]['aprovechamiento_forestal'] is None
+    assert proyectos[0]['aprovechamiento_forestal_detalle'] == 'Exonerado'
     assert proyectos[1]['numero_arboles'] is None
     assert proyectos[1]['aprovechamiento_forestal'] == 'visita'
+    assert proyectos[1]['aprovechamiento_forestal_detalle'] == 'Visita'
 
 
 def test_get_proyectos_activos_sin_proyectos():

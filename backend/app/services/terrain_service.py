@@ -379,6 +379,7 @@ def _get_proyectos_activos(terrain_id: int) -> list[dict]:
             'tipo_estructura': tipo_estructura,
             'numero_arboles': numero_arboles,
             'aprovechamiento_forestal': _resolve_aprovechamiento_nivel(aprov_raw),
+            'aprovechamiento_forestal_detalle': aprov_raw or None,
             'arriendo_anual': r['arriendo_anual'],
         })
     return proyectos
