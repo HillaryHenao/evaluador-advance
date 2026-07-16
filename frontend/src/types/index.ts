@@ -106,6 +106,7 @@ export interface TerrainData {
   coexistencias_detalle: CoexistenciaDetalle[] | null
   produccion_especifica: number | null
   arriendo_anual: number | null
+  area_hectareas: number | null
   proyectos: ProyectoData[]
 }
 

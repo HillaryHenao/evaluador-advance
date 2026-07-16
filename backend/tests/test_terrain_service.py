@@ -35,6 +35,15 @@ def test_resolve_aprovechamiento_nivel_vacio():
     assert terrain_service._resolve_aprovechamiento_nivel('') is None
 
 
+def test_m2_a_hectareas_convierte():
+    assert terrain_service._m2_a_hectareas(60000.0) == 6.0
+
+
+def test_m2_a_hectareas_none_cuando_cero_o_nulo():
+    assert terrain_service._m2_a_hectareas(0) is None
+    assert terrain_service._m2_a_hectareas(None) is None
+
+
 def test_get_proyectos_activos_devuelve_datos_por_proyecto():
     # COLSANT5: P1 en visita con 2 árboles, P2 exonerado con 0 árboles — cada uno con su
     # propio dato, sin funnel a un valor compartido del terreno. Cada uno también trae su

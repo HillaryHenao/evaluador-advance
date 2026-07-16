@@ -385,6 +385,13 @@ def _get_proyectos_activos(terrain_id: int) -> list[dict]:
     return proyectos
 
 
+def _m2_a_hectareas(area_m2: Optional[float]) -> Optional[float]:
+    """Convierte área en m² a hectáreas (1 ha = 10.000 m²). None si no hay dato o es 0."""
+    if not area_m2:
+        return None
+    return area_m2 / 10_000
+
+
 def get_terrain_data(code: str) -> Optional[dict]:
     """Fetch terrain data from PostgreSQL. Returns None if terrain not found."""
     database_url = os.environ['DATABASE_URL']
@@ -399,6 +406,7 @@ def get_terrain_data(code: str) -> Optional[dict]:
                     p.name                                      AS name,
                     tc.name                                     AS municipality,
                     p.grid_operator_id                          AS "or",
+                    t.area_m2                                   AS area_m2,
                     (
                         SELECT COUNT(*)
                         FROM minifarm_project mp2
@@ -439,6 +447,8 @@ def get_terrain_data(code: str) -> Optional[dict]:
     # operador de red: frontend usa mayúsculas (AFINIA, ESSA, EPM…)
     if d.get('or'):
         d['or'] = d['or'].upper()
+
+    d['area_hectareas'] = _m2_a_hectareas(d.pop('area_m2', None))
 
     project_ids = _get_active_project_ids(terrain_id)
 
