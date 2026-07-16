@@ -4,7 +4,9 @@ const ITEMS: ChecklistItemDef[] = [
   { key: 'canal_concreto', label: 'Canal en concreto (2m x 0.5m)', unit: 'm', group: 'metro', groupLabel: 'Costo por metro lineal', tarifa: 1_300_000 },
   { key: 'cuneta_via', label: 'Cuneta típica de vía', unit: 'm', group: 'metro', groupLabel: 'Costo por metro lineal', tarifa: 300_000 },
   { key: 'box_culvert', label: 'Box culvert (3m x 3m)', unit: 'cruces', group: 'fijo', groupLabel: 'Costo fijo por cruce', tarifa: 170_000_000 },
+  { key: 'box_culvert_1m', label: 'Box culvert (1.0m x 1.0m)', unit: 'cruces', group: 'fijo', groupLabel: 'Costo fijo por cruce', tarifa: 100_000_000 },
   { key: 'alcantarilla_cruce', label: 'Alcantarilla (Ø0.9m)', unit: 'cruces', group: 'fijo', groupLabel: 'Costo fijo por cruce', tarifa: 50_000_000 },
+  { key: 'alcantarilla_cruce_1_5m', label: 'Alcantarilla (1.5m x 1.5m)', unit: 'cruces', group: 'fijo', groupLabel: 'Costo fijo por cruce', tarifa: 70_000_000 },
 ]
 
 const obrasHidraulicas: CriterionModule = {

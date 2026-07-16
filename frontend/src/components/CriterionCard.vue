@@ -26,7 +26,9 @@ const EMPTY_OBRAS_HIDRAULICAS: ObrasHidraulicasValue = {
   canal_concreto: { activo: false, cantidad: null },
   cuneta_via: { activo: false, cantidad: null },
   box_culvert: { activo: false, cantidad: null },
+  box_culvert_1m: { activo: false, cantidad: null },
   alcantarilla_cruce: { activo: false, cantidad: null },
+  alcantarilla_cruce_1_5m: { activo: false, cantidad: null },
 }
 
 const checklistValue = computed<ObrasHidraulicasValue>(() => {

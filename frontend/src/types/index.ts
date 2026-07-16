@@ -20,7 +20,9 @@ export interface ObrasHidraulicasValue {
   canal_concreto: ObraHidraulicaItem
   cuneta_via: ObraHidraulicaItem
   box_culvert: ObraHidraulicaItem
+  box_culvert_1m: ObraHidraulicaItem
   alcantarilla_cruce: ObraHidraulicaItem
+  alcantarilla_cruce_1_5m: ObraHidraulicaItem
 }
 
 export type CriterionValue = number | boolean | string | null | ObrasHidraulicasValue

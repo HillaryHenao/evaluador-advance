@@ -187,7 +187,9 @@ describe('obras_hidraulicas', () => {
     canal_concreto: { activo: false, cantidad: null },
     cuneta_via: { activo: false, cantidad: null },
     box_culvert: { activo: false, cantidad: null },
+    box_culvert_1m: { activo: false, cantidad: null },
     alcantarilla_cruce: { activo: false, cantidad: null },
+    alcantarilla_cruce_1_5m: { activo: false, cantidad: null },
   }
 
   it('calcula 40m de canal en concreto a 1.300.000/m', () => {
@@ -214,6 +216,16 @@ describe('obras_hidraulicas', () => {
     expect(obrasHidraulicas.computeCost(value, ctx)).toBe(0)
   })
 
+  it('calcula 1 cruce de box culvert 1.0m x 1.0m a 100.000.000', () => {
+    const value = { ...vacio, box_culvert_1m: { activo: true, cantidad: 1 } }
+    expect(obrasHidraulicas.computeCost(value, ctx)).toBe(100_000_000)
+  })
+
+  it('calcula 1 cruce de alcantarilla 1.5m x 1.5m a 70.000.000', () => {
+    const value = { ...vacio, alcantarilla_cruce_1_5m: { activo: true, cantidad: 1 } }
+    expect(obrasHidraulicas.computeCost(value, ctx)).toBe(70_000_000)
+  })
+
   it('retorna 0 para valor nulo', () => {
     expect(obrasHidraulicas.computeCost(null, ctx)).toBe(0)
   })
@@ -223,12 +235,14 @@ describe('obras_hidraulicas', () => {
     expect(obrasHidraulicas.category).toBe('fijo')
   })
 
-  it('define checklistItems en el orden canal, cuneta, box culvert, alcantarilla', () => {
+  it('define checklistItems en el orden canal, cuneta, box culverts, alcantarillas', () => {
     expect(obrasHidraulicas.checklistItems?.map(item => item.key)).toEqual([
       'canal_concreto',
       'cuneta_via',
       'box_culvert',
+      'box_culvert_1m',
       'alcantarilla_cruce',
+      'alcantarilla_cruce_1_5m',
     ])
   })
 })
