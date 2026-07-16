@@ -21,6 +21,7 @@ const mockTerrain: TerrainData = {
   produccion_especifica: 4.5287,
   arriendo_anual: 26275000,
   area_hectareas: 6,
+  precio_hectarea: 4379166,
   proyectos: [
     { nombre: 'Test Proyecto', distancia_via: 120, distancia_red: 350, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: 5, tipo_estructura: 'Tracker', arriendo_anual: 26275000 },
   ],
@@ -84,7 +85,7 @@ describe('perProjectValues y perProjectResults', () => {
       ocupacion_cauce: false, ocupacion_cauce_detalle: 'No Requiere',
       servidumbre: 0, servidumbre_detalle: null,
       coexistencias: false, coexistencias_detalle: [],
-      produccion_especifica: 4.5, arriendo_anual: 20_000_000, area_hectareas: 10,
+      produccion_especifica: 4.5, arriendo_anual: 20_000_000, area_hectareas: 10, precio_hectarea: 2_000_000,
       proyectos: [
         { nombre: 'P1', distancia_via: 10, distancia_red: 30, aprovechamiento_forestal: 'visita', aprovechamiento_forestal_detalle: 'Visita', numero_arboles: 2, tipo_estructura: 'tracker', arriendo_anual: 12_000_000 },
         { nombre: 'P2', distancia_via: 12, distancia_red: 28, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: 'Exonerado', numero_arboles: 0, tipo_estructura: 'mesa_fija', arriendo_anual: 8_000_000 },
@@ -111,7 +112,7 @@ describe('perProjectValues y perProjectResults', () => {
       ocupacion_cauce: false, ocupacion_cauce_detalle: 'No Requiere',
       servidumbre: 0, servidumbre_detalle: null,
       coexistencias: false, coexistencias_detalle: [],
-      produccion_especifica: 4.5, arriendo_anual: 20_000_000, area_hectareas: 10,
+      produccion_especifica: 4.5, arriendo_anual: 20_000_000, area_hectareas: 10, precio_hectarea: 2_000_000,
       proyectos: [
         { nombre: 'P1', distancia_via: 10, distancia_red: 30, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: 0, tipo_estructura: 'tracker', arriendo_anual: 12_000_000 },
         { nombre: 'P2', distancia_via: 12, distancia_red: 28, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: 0, tipo_estructura: 'mesa_fija', arriendo_anual: 8_000_000 },
@@ -134,7 +135,7 @@ describe('perProjectFinancials', () => {
       ocupacion_cauce: false, ocupacion_cauce_detalle: 'No Requiere',
       servidumbre: 0, servidumbre_detalle: null,
       coexistencias: false, coexistencias_detalle: [],
-      produccion_especifica: 4.5, arriendo_anual: 20_000_000, area_hectareas: 10,
+      produccion_especifica: 4.5, arriendo_anual: 20_000_000, area_hectareas: 10, precio_hectarea: 2_000_000,
       // Sin datos de scope 'proyecto' (todo null). El único costo fijo que sí aplica es el
       // crédito de cluster (scope 'terreno_dividido', cluster=2 → -15M repartido entre los
       // 2 proyectos = -7.5M cada uno) — el capex de cada proyecto es store.baseCapex menos
@@ -174,7 +175,7 @@ describe('perProjectFinancials', () => {
       ocupacion_cauce: false, ocupacion_cauce_detalle: 'No Requiere',
       servidumbre: 0, servidumbre_detalle: null,
       coexistencias: false, coexistencias_detalle: [],
-      produccion_especifica: 4.5, arriendo_anual: 20_000_000, area_hectareas: 10,
+      produccion_especifica: 4.5, arriendo_anual: 20_000_000, area_hectareas: 10, precio_hectarea: 2_000_000,
       proyectos: [
         { nombre: 'P1', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 12_000_000 },
         { nombre: 'P2', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 8_000_000 },

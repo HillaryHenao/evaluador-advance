@@ -107,6 +107,7 @@ export interface TerrainData {
   produccion_especifica: number | null
   arriendo_anual: number | null
   area_hectareas: number | null
+  precio_hectarea: number | null
   proyectos: ProyectoData[]
 }
 

@@ -25,11 +25,6 @@ function formatAnios(value: number): string {
 const faltaProduccion = computed(() => !store.terrainData?.produccion_especifica)
 const faltaArriendo = computed(() => !store.arriendoManual && !store.terrainData?.arriendo_anual)
 const arriendoEfectivo = computed(() => store.arriendoManual ?? store.terrainData?.arriendo_anual ?? null)
-const arriendoPorHectarea = computed(() => {
-  const hectareas = store.terrainData?.area_hectareas
-  if (!arriendoEfectivo.value || !hectareas) return null
-  return arriendoEfectivo.value / hectareas
-})
 </script>
 
 <template>
@@ -88,9 +83,14 @@ const arriendoPorHectarea = computed(() => {
         <span class="financial-value">{{ formatCOP(arriendoEfectivo) }}</span>
       </div>
 
-      <div class="financial-row" v-if="arriendoPorHectarea">
-        <span class="financial-label">Arriendo / Ha</span>
-        <span class="financial-value">{{ formatCOP(arriendoPorHectarea) }}</span>
+      <div class="financial-row" v-if="store.terrainData?.precio_hectarea">
+        <span class="financial-label">Precio / Ha</span>
+        <span class="financial-value">{{ formatCOP(store.terrainData.precio_hectarea) }}</span>
+      </div>
+
+      <div class="financial-row" v-if="store.terrainData?.area_hectareas">
+        <span class="financial-label">Ha negociadas</span>
+        <span class="financial-value">{{ store.terrainData.area_hectareas }} Ha</span>
       </div>
 
       <label class="financial-input-label">

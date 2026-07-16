@@ -406,7 +406,6 @@ def get_terrain_data(code: str) -> Optional[dict]:
                     p.name                                      AS name,
                     tc.name                                     AS municipality,
                     p.grid_operator_id                          AS "or",
-                    t.area_m2                                   AS area_m2,
                     (
                         SELECT COUNT(*)
                         FROM minifarm_project mp2
@@ -414,12 +413,35 @@ def get_terrain_data(code: str) -> Optional[dict]:
                           AND mp2.stage NOT IN ('dead', 'paused', 'uci')
                     )                                           AS cluster,
                     (
-                        SELECT SUM(ts.rent_annual_cost_cop)
-                        FROM minifarm_project mp3
-                        JOIN termsheet_termsheet ts ON ts.id = mp3.termsheet_id
-                        WHERE mp3.terrain_id = t.id
-                          AND mp3.stage NOT IN ('dead', 'paused', 'uci')
-                    )                                           AS arriendo_anual
+                        -- DISTINCT por termsheet: varios proyectos activos pueden compartir el
+                        -- mismo termsheet (apportionment='none'); sumar por proyecto lo duplicaría.
+                        SELECT SUM(rent_annual_cost_cop) FROM (
+                            SELECT DISTINCT ts.id, ts.rent_annual_cost_cop
+                            FROM minifarm_project mp3
+                            JOIN termsheet_termsheet ts ON ts.id = mp3.termsheet_id
+                            WHERE mp3.terrain_id = t.id
+                              AND mp3.stage NOT IN ('dead', 'paused', 'uci')
+                        ) ts_arriendo
+                    )                                           AS arriendo_anual,
+                    (
+                        -- Ha negociadas: área del termsheet (no el área física completa del
+                        -- predio en termsheet_terrain), misma deduplicación por termsheet.
+                        SELECT SUM(rent_area_m2) FROM (
+                            SELECT DISTINCT ts.id, ts.rent_area_m2
+                            FROM minifarm_project mp4
+                            JOIN termsheet_termsheet ts ON ts.id = mp4.termsheet_id
+                            WHERE mp4.terrain_id = t.id
+                              AND mp4.stage NOT IN ('dead', 'paused', 'uci')
+                        ) ts_area
+                    )                                           AS rent_area_m2,
+                    (
+                        -- precio_hectarea: minifarm_project.annual_price ya viene en COP/Ha,
+                        -- no se deriva dividiendo arriendo_anual entre el área.
+                        SELECT AVG(mp5.annual_price)
+                        FROM minifarm_project mp5
+                        WHERE mp5.terrain_id = t.id
+                          AND mp5.stage NOT IN ('dead', 'paused', 'uci')
+                    )                                           AS precio_hectarea
 
                 FROM termsheet_terrain t
                 JOIN minifarm_project p ON p.terrain_id = t.id
@@ -448,7 +470,8 @@ def get_terrain_data(code: str) -> Optional[dict]:
     if d.get('or'):
         d['or'] = d['or'].upper()
 
-    d['area_hectareas'] = _m2_a_hectareas(d.pop('area_m2', None))
+    d['area_hectareas'] = _m2_a_hectareas(d.pop('rent_area_m2', None))
+    d['precio_hectarea'] = float(d['precio_hectarea']) if d.get('precio_hectarea') is not None else None
 
     project_ids = _get_active_project_ids(terrain_id)
 
