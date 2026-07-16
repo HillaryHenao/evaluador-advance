@@ -34,8 +34,10 @@ describe('useEvaluatorStore', () => {
     vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue(mockTerrain)
     const store = useEvaluatorStore()
     await store.fetchTerrain('COLCEST5')
-    expect(store.criterionValues['or']).toBe('AFINIA')
     expect(store.criterionValues['nivel_tension']).toBe('34.5 kV')
+    // 'or' ahora es puramente manual (meses de retraso) — el nombre real del operador vive
+    // en terrainData.or (mostrado como detalle de solo lectura), no se autopobla en criterionValues.
+    expect(store.criterionValues['or']).toBeUndefined()
     // Los criterios scope 'proyecto' ya no se autopoblan en criterionValues:
     // viven en perProjectValues (ver describe 'perProjectValues y perProjectResults').
     expect(store.criterionValues['distancia_via']).toBeUndefined()

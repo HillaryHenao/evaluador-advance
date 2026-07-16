@@ -5,6 +5,7 @@ import pilotes from '../pilotes'
 import numeroArboles from '../numero_arboles'
 import propietario from '../propietario'
 import servidumbre from '../servidumbre'
+import or from '../or'
 import cluster from '../cluster'
 import aprovechamientoForestal from '../aprovechamiento_forestal'
 import ocupacionCauce from '../ocupacion_cauce'
@@ -85,6 +86,26 @@ describe('servidumbre', () => {
   })
   it('tiene riskType meses', () => {
     expect(servidumbre.riskType).toBe('meses')
+  })
+})
+
+describe('or', () => {
+  it('0 meses no agrega sobrecosto', () => {
+    expect(or.computeCost(0, ctx)).toBe(0)
+  })
+  it('retorna 0 para valor nulo (aún sin definir manualmente)', () => {
+    expect(or.computeCost(null, ctx)).toBe(0)
+  })
+  it('calcula 60.000.000 por mes de retraso', () => {
+    expect(or.computeCost(1, ctx)).toBe(60_000_000)
+    expect(or.computeCost(3, ctx)).toBe(180_000_000)
+  })
+  it('es puramente manual: no tiene dbField ni consulta BD', () => {
+    expect(or.dataSource).toBe('manual')
+    expect(or.dbField).toBeUndefined()
+  })
+  it('tiene riskType meses', () => {
+    expect(or.riskType).toBe('meses')
   })
 })
 

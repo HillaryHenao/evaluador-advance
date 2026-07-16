@@ -1,26 +1,19 @@
 import type { CriterionModule, CriterionValue, EvalContext } from '@/types'
+import { COSTO_POR_MES } from '@/engine/evaluatorEngine'
 
 const or: CriterionModule = {
   id: 'or',
   label: 'Operador de Red',
-  inputType: 'select',
-  dataSource: 'db',
-  dbField: 'or',
-  options: [
-    { value: 'AFINIA', label: 'AFINIA' },
-    { value: 'ESSA', label: 'ESSA' },
-    { value: 'EPM', label: 'EPM' },
-    { value: 'ENEL', label: 'ENEL' },
-    { value: 'EMCALI', label: 'EMCALI' },
-    { value: 'ENERCA', label: 'ENERCA' },
-    { value: 'CENS', label: 'CENS' },
-    { value: 'CEDENAR', label: 'CEDENAR' },
-  ],
-  formulaDefined: false,
+  inputType: 'number',
+  unit: 'meses de retraso',
+  dataSource: 'manual',
+  formulaDefined: true,
   category: 'probabilidad',
+  riskType: 'meses',
   scope: 'terreno_dividido',
-  computeCost(_value: CriterionValue, _context: EvalContext): number {
-    return 0
+  computeCost(value: CriterionValue, _context: EvalContext): number {
+    if (value === null || typeof value !== 'number' || value <= 0) return 0
+    return value * COSTO_POR_MES
   },
 }
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { loadCriteria, evaluateCriteria, aggregateCosts, evaluateScoped } from '../evaluatorEngine'
-import comunidad from '@/criteria/comunidad'
+import tipoEstructura from '@/criteria/tipo_estructura'
 import type { EvalContext } from '@/types'
 
 const ctx: EvalContext = { baseCapex: 4_000_000_000, kWp: 1320 }
@@ -43,10 +43,10 @@ describe('evaluateCriteria', () => {
   })
 
   it('retorna sobrecosto 0 para criterios con formulaDefined=false, sin invocar computeCost', () => {
-    const computeCostSpy = vi.spyOn(comunidad, 'computeCost')
-    const values = { comunidad: 'conflicto' }
+    const computeCostSpy = vi.spyOn(tipoEstructura, 'computeCost')
+    const values = { tipo_estructura: 'tracker' }
     const results = evaluateCriteria(values, ctx)
-    const result = results.find(r => r.id === 'comunidad')
+    const result = results.find(r => r.id === 'tipo_estructura')
     expect(result?.sobrecosto).toBe(0)
     expect(result?.formulaDefined).toBe(false)
     expect(computeCostSpy).not.toHaveBeenCalled()
@@ -99,6 +99,14 @@ describe('aggregateCosts', () => {
 
   it('amenazas suma a totalRetraso en meses, no a totalRiesgoCosto', () => {
     const values = { amenazas: 'malo' }
+    const results = evaluateCriteria(values, ctx)
+    const aggregated = aggregateCosts(results, ctx)
+    expect(aggregated.totalRetrasoMeses).toBe(2)
+    expect(aggregated.totalRiesgoCosto).toBe(0)
+  })
+
+  it('comunidad usa los mismos niveles y fórmula que amenazas: suma a totalRetraso en meses', () => {
+    const values = { comunidad: 'malo' }
     const results = evaluateCriteria(values, ctx)
     const aggregated = aggregateCosts(results, ctx)
     expect(aggregated.totalRetrasoMeses).toBe(2)

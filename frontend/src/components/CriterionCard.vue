@@ -113,6 +113,11 @@ const servidumbreDetalle = computed(() => {
   return store.terrainData?.servidumbre_detalle ?? null
 })
 
+const orDetalle = computed(() => {
+  if (props.result.id !== 'or') return null
+  return store.terrainData?.or ?? null
+})
+
 const ocupacionCauceDetalle = computed(() => {
   if (props.result.id !== 'ocupacion_cauce') return null
   return store.terrainData?.ocupacion_cauce_detalle ?? null
@@ -147,7 +152,7 @@ function handleToggle(event: Event) {
       </div>
     </div>
 
-    <div class="card-input" :class="{ 'card-input--checklist': module?.inputType === 'checklist' }">
+    <div class="card-input" v-if="result.id !== 'coexistencias'" :class="{ 'card-input--checklist': module?.inputType === 'checklist' }">
       <template v-if="module?.inputType === 'number' && !isProyectoScope">
         <input
           type="number"
@@ -275,12 +280,17 @@ function handleToggle(event: Event) {
     </div>
 
     <!-- Coexistencias: detalle de entidades y estados -->
-    <div class="coexistencias-detalle" v-if="result.id === 'coexistencias' && coexistenciasDetalle.length > 0">
-      <div v-for="(item, idx) in coexistenciasDetalle" :key="idx" class="coexistencia-row">
-        <span class="coexistencia-entidad">{{ item.entidad }}</span>
-        <span class="coexistencia-estado" :class="{ 'coexistencia-estado--ok': item.estado === 'Aprobado' }">
-          {{ item.estado }}
-        </span>
+    <div class="coexistencias-detalle" v-if="result.id === 'coexistencias'">
+      <template v-if="coexistenciasDetalle.length > 0">
+        <div v-for="(item, idx) in coexistenciasDetalle" :key="idx" class="coexistencia-row">
+          <span class="coexistencia-entidad">{{ item.entidad }}</span>
+          <span class="coexistencia-estado" :class="{ 'coexistencia-estado--ok': item.estado === 'Aprobado' }">
+            {{ item.estado }}
+          </span>
+        </div>
+      </template>
+      <div v-else class="coexistencia-row">
+        <span class="coexistencia-entidad">No se registran coexistencias</span>
       </div>
     </div>
 
@@ -291,6 +301,14 @@ function handleToggle(event: Event) {
         <span class="coexistencia-estado" :class="{ 'coexistencia-estado--ok': servidumbreDetalle.estado === 'Aprobada' }">
           {{ servidumbreDetalle.estado }}
         </span>
+      </div>
+    </div>
+
+    <!-- Operador de red: nombre real desde BD (informativo, no limitado a una lista fija) -->
+    <div class="coexistencias-detalle" v-if="result.id === 'or' && orDetalle">
+      <div class="coexistencia-row">
+        <span class="coexistencia-entidad">Operador de red</span>
+        <span class="coexistencia-estado coexistencia-estado--ok">{{ orDetalle }}</span>
       </div>
     </div>
 
