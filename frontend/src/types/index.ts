@@ -1,4 +1,4 @@
-export type CriterionScope = 'proyecto' | 'terreno_dividido' | 'terreno_multiplicado' | 'terreno_no_dividido'
+export type CriterionScope = 'proyecto' | 'terreno_dividido' | 'terreno_multiplicado'
 
 export interface ProyectoData {
   nombre: string

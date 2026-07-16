@@ -92,8 +92,6 @@ export function evaluateScoped(
     const costoGeneral = criterion.scope === 'terreno_multiplicado' ? costoBase * n : costoBase
     general.push({ ...base, value, sobrecosto: costoGeneral })
 
-    if (criterion.scope === 'terreno_no_dividido') continue
-
     const costoPorProyecto = criterion.scope === 'terreno_multiplicado' ? costoBase : costoBase / n
     for (const nombre of proyectoNombres) {
       porProyecto[nombre].push({ ...base, value, sobrecosto: costoPorProyecto })

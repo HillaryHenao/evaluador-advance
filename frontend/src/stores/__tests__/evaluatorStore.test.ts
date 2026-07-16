@@ -132,9 +132,10 @@ describe('perProjectFinancials', () => {
       servidumbre: 0, servidumbre_detalle: null,
       coexistencias: false, coexistencias_detalle: [],
       produccion_especifica: 4.5, arriendo_anual: 20_000_000,
-      // Sin datos de scope 'proyecto' (todo null) para que el subtotal de sobrecostos
-      // fijos de cada proyecto sea 0 y el capex de cada uno sea exactamente store.baseCapex
-      // — así el test puede verificar el valor exacto sin recalcular fórmulas de criterios.
+      // Sin datos de scope 'proyecto' (todo null). El único costo fijo que sí aplica es el
+      // crédito de cluster (scope 'terreno_dividido', cluster=2 → -15M repartido entre los
+      // 2 proyectos = -7.5M cada uno) — el capex de cada proyecto es store.baseCapex menos
+      // ese crédito, no exactamente store.baseCapex.
       proyectos: [
         { nombre: 'P1', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 12_000_000 },
         { nombre: 'P2', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 8_000_000 },
@@ -145,11 +146,11 @@ describe('perProjectFinancials', () => {
     expect(store.perProjectFinancials).not.toBeNull()
 
     const esperadoP1 = calcularFinanzas({
-      capex: store.baseCapex, kWp: store.kWp, kVA: store.kVA,
+      capex: store.baseCapex - 7_500_000, kWp: store.kWp, kVA: store.kVA,
       produccionEspecifica: 4.5, arriendoAnual: 12_000_000,
     })
     const esperadoP2 = calcularFinanzas({
-      capex: store.baseCapex, kWp: store.kWp, kVA: store.kVA,
+      capex: store.baseCapex - 7_500_000, kWp: store.kWp, kVA: store.kVA,
       produccionEspecifica: 4.5, arriendoAnual: 8_000_000,
     })
 

@@ -27,7 +27,7 @@ describe('loadCriteria', () => {
 
   it('todos tienen un scope válido', () => {
     const criteria = loadCriteria()
-    const validScopes = ['proyecto', 'terreno_dividido', 'terreno_multiplicado', 'terreno_no_dividido']
+    const validScopes = ['proyecto', 'terreno_dividido', 'terreno_multiplicado']
     for (const c of criteria) {
       expect(validScopes).toContain(c.scope)
     }
@@ -147,13 +147,13 @@ describe('evaluateScoped', () => {
     expect(porProyecto['P2'].find(r => r.id === 'nivel_tension')?.sobrecosto).toBe(30_000_000)
   })
 
-  it('scope terreno_no_dividido: general sin cambios; no aparece por proyecto', () => {
+  it('cluster (terreno_dividido): general usa el crédito completo; por proyecto lo reparte entre N', () => {
     const values = { cluster: 2 }
     const { general, porProyecto } = evaluateScoped(values, {}, proyectoNombres, scopedCtx)
 
     expect(general.find(r => r.id === 'cluster')?.sobrecosto).toBe(-15_000_000)
-    expect(porProyecto['P1'].find(r => r.id === 'cluster')).toBeUndefined()
-    expect(porProyecto['P2'].find(r => r.id === 'cluster')).toBeUndefined()
+    expect(porProyecto['P1'].find(r => r.id === 'cluster')?.sobrecosto).toBe(-7_500_000)
+    expect(porProyecto['P2'].find(r => r.id === 'cluster')?.sobrecosto).toBe(-7_500_000)
   })
 
   it('sin proyectos activos (projectCount ausente): terreno_dividido no divide (usa 1)', () => {
