@@ -5,6 +5,7 @@ export interface ProyectoData {
   distancia_via: number | null
   distancia_red: number | null
   aprovechamiento_forestal: string | null
+  aprovechamiento_forestal_detalle: string | null
   numero_arboles: number | null
   tipo_estructura: string | null
   arriendo_anual: number | null

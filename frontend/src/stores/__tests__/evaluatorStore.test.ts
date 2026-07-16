@@ -21,7 +21,7 @@ const mockTerrain: TerrainData = {
   produccion_especifica: 4.5287,
   arriendo_anual: 26275000,
   proyectos: [
-    { nombre: 'Test Proyecto', distancia_via: 120, distancia_red: 350, aprovechamiento_forestal: null, numero_arboles: 5, tipo_estructura: 'Tracker', arriendo_anual: 26275000 },
+    { nombre: 'Test Proyecto', distancia_via: 120, distancia_red: 350, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: 5, tipo_estructura: 'Tracker', arriendo_anual: 26275000 },
   ],
 }
 
@@ -83,8 +83,8 @@ describe('perProjectValues y perProjectResults', () => {
       coexistencias: false, coexistencias_detalle: [],
       produccion_especifica: 4.5, arriendo_anual: 20_000_000,
       proyectos: [
-        { nombre: 'P1', distancia_via: 10, distancia_red: 30, aprovechamiento_forestal: 'visita', numero_arboles: 2, tipo_estructura: 'tracker', arriendo_anual: 12_000_000 },
-        { nombre: 'P2', distancia_via: 12, distancia_red: 28, aprovechamiento_forestal: null, numero_arboles: 0, tipo_estructura: 'mesa_fija', arriendo_anual: 8_000_000 },
+        { nombre: 'P1', distancia_via: 10, distancia_red: 30, aprovechamiento_forestal: 'visita', aprovechamiento_forestal_detalle: 'Visita', numero_arboles: 2, tipo_estructura: 'tracker', arriendo_anual: 12_000_000 },
+        { nombre: 'P2', distancia_via: 12, distancia_red: 28, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: 'Exonerado', numero_arboles: 0, tipo_estructura: 'mesa_fija', arriendo_anual: 8_000_000 },
       ],
     })
     await store.fetchTerrain('COLSANT5')
@@ -110,8 +110,8 @@ describe('perProjectValues y perProjectResults', () => {
       coexistencias: false, coexistencias_detalle: [],
       produccion_especifica: 4.5, arriendo_anual: 20_000_000,
       proyectos: [
-        { nombre: 'P1', distancia_via: 10, distancia_red: 30, aprovechamiento_forestal: null, numero_arboles: 0, tipo_estructura: 'tracker', arriendo_anual: 12_000_000 },
-        { nombre: 'P2', distancia_via: 12, distancia_red: 28, aprovechamiento_forestal: null, numero_arboles: 0, tipo_estructura: 'mesa_fija', arriendo_anual: 8_000_000 },
+        { nombre: 'P1', distancia_via: 10, distancia_red: 30, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: 0, tipo_estructura: 'tracker', arriendo_anual: 12_000_000 },
+        { nombre: 'P2', distancia_via: 12, distancia_red: 28, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: 0, tipo_estructura: 'mesa_fija', arriendo_anual: 8_000_000 },
       ],
     })
     await store.fetchTerrain('COLSANT5')
@@ -136,8 +136,8 @@ describe('perProjectFinancials', () => {
       // fijos de cada proyecto sea 0 y el capex de cada uno sea exactamente store.baseCapex
       // — así el test puede verificar el valor exacto sin recalcular fórmulas de criterios.
       proyectos: [
-        { nombre: 'P1', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 12_000_000 },
-        { nombre: 'P2', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 8_000_000 },
+        { nombre: 'P1', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 12_000_000 },
+        { nombre: 'P2', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 8_000_000 },
       ],
     })
     await store.fetchTerrain('COLSANT5')
@@ -172,8 +172,8 @@ describe('perProjectFinancials', () => {
       coexistencias: false, coexistencias_detalle: [],
       produccion_especifica: 4.5, arriendo_anual: 20_000_000,
       proyectos: [
-        { nombre: 'P1', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 12_000_000 },
-        { nombre: 'P2', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 8_000_000 },
+        { nombre: 'P1', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 12_000_000 },
+        { nombre: 'P2', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 8_000_000 },
       ],
     })
     await store.fetchTerrain('COLSANT5')

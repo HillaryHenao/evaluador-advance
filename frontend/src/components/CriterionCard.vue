@@ -54,6 +54,11 @@ const checklistGroups = computed(() => {
 
 const isProyectoScope = computed(() => module.value?.scope === 'proyecto')
 
+function detalleParaProyecto(nombre: string): string | null {
+  if (props.result.id !== 'aprovechamiento_forestal') return null
+  return store.terrainData?.proyectos.find(p => p.nombre === nombre)?.aprovechamiento_forestal_detalle ?? null
+}
+
 const proyectoRows = computed(() => {
   if (!isProyectoScope.value) return []
   const results = store.perProjectResults
@@ -63,6 +68,7 @@ const proyectoRows = computed(() => {
       nombre,
       value: result?.value ?? null,
       sobrecosto: result?.sobrecosto ?? 0,
+      detalle: detalleParaProyecto(nombre),
     }
   })
 })
@@ -214,7 +220,7 @@ function handleToggle(event: Event) {
         <div class="proyecto-rows">
           <div v-for="row in proyectoRows" :key="row.nombre" class="proyecto-row">
             <span class="proyecto-row-nombre">{{ row.nombre }}</span>
-            <span class="proyecto-row-valor">{{ row.value ?? '—' }}{{ module?.unit ? ` ${module.unit}` : '' }}</span>
+            <span class="proyecto-row-valor">{{ row.value ?? row.detalle ?? '—' }}{{ module?.unit ? ` ${module.unit}` : '' }}</span>
             <span class="proyecto-row-sobrecosto">{{ formatCOP(row.sobrecosto) }}</span>
           </div>
           <div class="proyecto-row proyecto-row--total">
