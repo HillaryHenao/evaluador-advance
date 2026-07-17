@@ -1,9 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useEvaluatorStore } from '@/stores/evaluatorStore'
-import { aggregateCosts } from '@/engine/evaluatorEngine'
+import { aggregateCosts, loadCriteria } from '@/engine/evaluatorEngine'
 
 const store = useEvaluatorStore()
+
+function tipoEstructuraLabel(nombre: string): string | null {
+  const raw = store.terrainData?.proyectos.find(p => p.nombre === nombre)?.tipo_estructura
+  if (!raw) return null
+  const opciones = loadCriteria().find(c => c.id === 'tipo_estructura')?.options
+  return opciones?.find(o => o.value === raw)?.label ?? raw
+}
+
+const nivelTension = computed(() => store.terrainData?.nivel_tension ?? null)
 
 function formatCOP(value: number): string {
   const sign = value < 0 ? '-' : ''
@@ -44,6 +53,7 @@ const proyectos = computed(() => {
     )
     return {
       nombre,
+      tipoEstructura: tipoEstructuraLabel(nombre),
       fijoItems,
       riesgoItems,
       costosFijos: aggregated.totalSobrecostoFijo,
@@ -88,6 +98,11 @@ const proyectos = computed(() => {
     <div class="breakdown-grid">
       <div v-for="p in proyectos" :key="p.nombre" class="breakdown-card">
         <div class="breakdown-card-title">{{ p.nombre }}</div>
+        <div v-if="p.tipoEstructura || nivelTension" class="breakdown-card-subtitle">
+          <span v-if="p.tipoEstructura">{{ p.tipoEstructura }}</span>
+          <span v-if="p.tipoEstructura && nivelTension"> · </span>
+          <span v-if="nivelTension">{{ nivelTension }}</span>
+        </div>
 
         <div v-if="p.fijoItems.length === 0" class="breakdown-empty">
           Sin sobrecostos fijos calculados.
@@ -177,9 +192,15 @@ const proyectos = computed(() => {
   font-size: 0.82rem;
   font-weight: 700;
   color: var(--text);
-  margin-bottom: 0.6rem;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--border);
+}
+.breakdown-card-subtitle {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 0.6rem;
+  padding-top: 0.35rem;
 }
 .breakdown-row {
   display: flex;
