@@ -167,6 +167,41 @@ describe('perProjectFinancials', () => {
     expect(store.perProjectFinancials!['P1'].vpn).not.toBe(store.perProjectFinancials!['P2'].vpn)
   })
 
+  it('mesa_fija usa un CAPEX base distinto (3.750M) al de los demás proyectos (4.000M)', async () => {
+    const store = useEvaluatorStore()
+    vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue({
+      code: 'COLSANT5', name: 'Test', municipality: 'Giron', or: 'ESSA',
+      nivel_tension: '13.8kV', cluster: 2,
+      ocupacion_cauce: false, ocupacion_cauce_detalle: 'No Requiere',
+      servidumbre: 0, servidumbre_detalle: null,
+      coexistencias: false, coexistencias_detalle: [],
+      produccion_especifica: 4.5, arriendo_anual: 20_000_000, area_hectareas: 10, precio_hectarea: 2_000_000,
+      proyectos: [
+        { nombre: 'P1', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: 'tracker', arriendo_anual: 12_000_000 },
+        { nombre: 'P2', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: 'mesa_fija', arriendo_anual: 8_000_000 },
+      ],
+    })
+    await store.fetchTerrain('COLSANT5')
+
+    // El crédito de cluster (terreno_dividido, cluster=2 → -15M) se sigue repartiendo por
+    // igual entre los 2 proyectos (-7.5M c/u), independiente del capex base de cada uno.
+    const esperadoP1 = calcularFinanzas({
+      capex: store.baseCapex - 7_500_000, kWp: store.kWp, kVA: store.kVA,
+      produccionEspecifica: 4.5, arriendoAnual: 12_000_000,
+    })
+    const esperadoP2 = calcularFinanzas({
+      capex: 3_750_000_000 - 7_500_000, kWp: store.kWp, kVA: store.kVA,
+      produccionEspecifica: 4.5, arriendoAnual: 8_000_000,
+    })
+
+    expect(store.perProjectFinancials!['P1'].vpn).toBeCloseTo(esperadoP1.vpn, 6)
+    expect(store.perProjectFinancials!['P2'].vpn).toBeCloseTo(esperadoP2.vpn, 6)
+
+    // El total general suma el capex base de CADA proyecto (4.000M + 3.750M), no
+    // baseCapex * N (que asumiría que todos los proyectos usan el mismo capex base).
+    expect(store.aggregated.capexTotal).toBe(store.baseCapex + 3_750_000_000 - 15_000_000)
+  })
+
   it('general (financialResults) multiplica kWp y kVA por N, no los deja sin escalar', async () => {
     const store = useEvaluatorStore()
     vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue({

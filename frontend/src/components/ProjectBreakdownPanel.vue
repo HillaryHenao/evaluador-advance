@@ -27,8 +27,9 @@ const proyectos = computed(() => {
   const n = Math.max(store.proyectoNombres.length, 1)
   return store.proyectoNombres.map(nombre => {
     const results = store.perProjectResults[nombre] ?? []
+    const capexBase = store.capexBaseParaProyecto(nombre)
     const aggregated = aggregateCosts(results, {
-      baseCapex: store.baseCapex,
+      baseCapex: capexBase,
       kWp: store.kWp,
       projectCount: n,
     })
@@ -41,7 +42,6 @@ const proyectos = computed(() => {
     const riesgoItems = aggregated.breakdown.filter(
       r => r.category === 'probabilidad' && r.formulaDefined && r.sobrecosto > 0,
     )
-    const capexBase = store.baseCapex
     return {
       nombre,
       fijoItems,

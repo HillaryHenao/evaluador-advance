@@ -10,6 +10,7 @@ type CriterionValues = Record<string, CriterionValue>
 type PerProjectValues = Record<string, Record<string, CriterionValue>>
 
 const BASE_CAPEX_DEFAULT = 4_000_000_000
+const MESA_FIJA_CAPEX = 3_750_000_000
 const KWP_DEFAULT = 1320
 const PROYECTO_SCOPE_DB_FIELDS = ['distancia_via', 'distancia_red', 'aprovechamiento_forestal', 'numero_arboles', 'tipo_estructura']
 
@@ -27,11 +28,23 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
   const proyectoNombres = computed(() => terrainData.value?.proyectos.map(p => p.nombre) ?? [])
   const projectCount = computed(() => Math.max(proyectoNombres.value.length, 1))
 
+  // Mesa fija usa un CAPEX base distinto (menor) al resto de tipos de estructura —
+  // cada proyecto resuelve el suyo propio según su tipo_estructura (scope 'proyecto').
+  function capexBaseParaProyecto(nombre: string): number {
+    return perProjectValues.value.tipo_estructura?.[nombre] === 'mesa_fija' ? MESA_FIJA_CAPEX : baseCapex.value
+  }
+
   // baseCapex y kWp son magnitudes POR PROYECTO (cada proyecto construye su propia
-  // instalación completa) — el contexto general las multiplica por N en vez de usarlas
-  // tal cual, para que aggregateCosts sume correctamente el capex de los N proyectos.
+  // instalación completa) — el contexto general suma el capex base de CADA proyecto
+  // (no siempre el mismo, ver capexBaseParaProyecto) para que aggregateCosts sume
+  // correctamente el capex de los N proyectos.
+  const totalCapexBase = computed(() => {
+    if (proyectoNombres.value.length === 0) return baseCapex.value * projectCount.value
+    return proyectoNombres.value.reduce((acc, nombre) => acc + capexBaseParaProyecto(nombre), 0)
+  })
+
   const context = computed(() => ({
-    baseCapex: baseCapex.value * projectCount.value,
+    baseCapex: totalCapexBase.value,
     kWp: kWp.value * projectCount.value,
     projectCount: projectCount.value,
   }))
@@ -76,7 +89,7 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
       // divididos entre N y los de scope proyecto con el valor propio — ver
       // evaluateScoped en evaluatorEngine.ts).
       const results = perProjectResults.value[proyecto.nombre] ?? []
-      const capexProyecto = baseCapex.value + aggregateCosts(results, {
+      const capexProyecto = capexBaseParaProyecto(proyecto.nombre) + aggregateCosts(results, {
         baseCapex: baseCapex.value, kWp: kWp.value, projectCount: 1,
       }).totalSobrecostoFijo
 
@@ -148,5 +161,6 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
     terrainData, criterionValues, perProjectValues, baseCapex, kWp, kVA, arriendoManual,
     loading, error, aggregated, financialResults, perProjectResults, perProjectFinancials,
     proyectoNombres, fetchTerrain, setCriterionValue, setPilotesForProyecto, reset,
+    capexBaseParaProyecto,
   }
 })
