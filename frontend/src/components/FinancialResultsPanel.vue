@@ -108,35 +108,35 @@ const arriendoEfectivo = computed(() => store.arriendoManual ?? store.terrainDat
 
 <style scoped>
 .financial-panel {
-  width: 280px;
-  min-width: 280px;
+  width: 360px;
+  min-width: 360px;
   background: var(--card);
   border-left: 1.5px solid var(--border);
-  padding: 1.5rem 1.25rem;
+  padding: 2rem 1.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
+  gap: 0.85rem;
 }
 
 .financial-title {
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 1.5px;
   color: var(--purple);
-  padding-bottom: 0.75rem;
+  padding-bottom: 0.85rem;
   border-bottom: 2px solid var(--border);
-  margin-bottom: 0.1rem;
+  margin-bottom: 0.2rem;
 }
 
 .financial-row {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
 }
 .financial-label { color: var(--text-mid); font-weight: 500; }
-.financial-value { font-weight: 700; color: var(--text); }
+.financial-value { font-weight: 700; color: var(--text); font-size: 1rem; }
 .financial-value--highlight { color: var(--purple); }
 
 .financial-divider { height: 1px; background: var(--border); margin: 0.2rem 0; }
