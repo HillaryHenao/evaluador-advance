@@ -123,12 +123,12 @@ async function handleSearch() {
   border: 1.5px solid transparent;
 }
 .terrain-info--found {
-  background: #f0e8ff;
-  border-color: var(--purple);
-  color: var(--purple-deep);
+  background: #D6E965;
+  border-color: #D6E965;
+  color: #13294B;
 }
-.terrain-check { color: var(--purple); font-weight: 800; }
-.terrain-sep { color: var(--purple-soft); }
+.terrain-check { color: #13294B; font-weight: 800; }
+.terrain-sep { color: #13294B; }
 
 .terrain-error {
   margin-top: 0.5rem;
