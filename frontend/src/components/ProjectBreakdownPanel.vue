@@ -196,11 +196,16 @@ const proyectos = computed(() => {
   border-bottom: 1px solid var(--border);
 }
 .breakdown-card-subtitle {
+  display: inline-flex;
+  width: fit-content;
   font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--muted);
+  font-weight: 700;
+  color: #13294B;
+  background: #D6E965;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  margin-top: 0.5rem;
   margin-bottom: 0.6rem;
-  padding-top: 0.35rem;
 }
 .breakdown-row {
   display: flex;
