@@ -21,6 +21,22 @@ const DEPRECIACION_ANIOS = 15
 const TASA_IMPUESTO_RENTA = 0.35
 const TASA_DESCUENTO_VPN = 0.10
 
+// Caso de referencia del Excel (Supuestos!D5/D6): los montos literales de
+// MANTENIMIENTO_TRACKER y REEMPLAZO_INVERSORES en financialData.ts fueron calculados
+// para un proyecto de este tamaño exacto — se escalan proporcionalmente para otros tamaños.
+const KWP_REFERENCIA = 1320
+const KVA_REFERENCIA = 1000
+
+// Mantenimiento de tracker: costo de la estructura mecánica (lado DC) → escala con kWp.
+export function costoMantenimientoTracker(k: number, kWp: number): number {
+  return (MANTENIMIENTO_TRACKER[k] ?? 0) * (kWp / KWP_REFERENCIA)
+}
+
+// Reemplazo de inversores y motores: equipo del lado AC → escala con kVA.
+export function costoReemplazoInversores(k: number, kVA: number): number {
+  return (REEMPLAZO_INVERSORES[k] ?? 0) * (kVA / KVA_REFERENCIA)
+}
+
 function activo(anio: number): number {
   return anio - (AÑO_BASE + 1) <= DURACION_OPERACION_ANIOS ? 1 : 0
 }
@@ -116,9 +132,10 @@ export function calcularFlujosDeCaja(inputs: FinancialInputs): {
     }
 
     // Mantenimiento de tracker (cada 5 años) y reemplazo de inversores (una vez, año 16):
-    // montos fijos ya calculados con las tarifas y FX del Excel (ver financialData.ts).
-    const mantenimientoTracker = MANTENIMIENTO_TRACKER[k] ?? 0
-    const reemplazoInversores = REEMPLAZO_INVERSORES[k] ?? 0
+    // montos base ya calculados con las tarifas y FX del Excel (financialData.ts), escalados
+    // proporcionalmente al tamaño real del proyecto (ver costoMantenimientoTracker/costoReemplazoInversores).
+    const mantenimientoTracker = costoMantenimientoTracker(k, kWp)
+    const reemplazoInversores = costoReemplazoInversores(k, kVA)
 
     flujoOperativo[k] =
       ingresos[k] +

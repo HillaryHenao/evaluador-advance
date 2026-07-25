@@ -22,9 +22,10 @@ function formatAnios(value: number): string {
   return `${value.toFixed(1)} años`
 }
 
-const faltaProduccion = computed(() => !store.terrainData?.produccion_especifica)
+const faltaProduccion = computed(() => !store.produccionEspecificaManual && !store.terrainData?.produccion_especifica)
 const faltaArriendo = computed(() => !store.arriendoManual && !store.terrainData?.arriendo_anual)
 const arriendoEfectivo = computed(() => store.arriendoManual ?? store.terrainData?.arriendo_anual ?? null)
+const produccionEfectiva = computed(() => store.produccionEspecificaManual ?? store.terrainData?.produccion_especifica ?? null)
 </script>
 
 <template>
@@ -32,15 +33,8 @@ const arriendoEfectivo = computed(() => store.arriendoManual ?? store.terrainDat
     <h2 class="financial-title">Resultados financieros</h2>
 
     <div v-if="!store.financialResults" class="financial-empty">
-      <p v-if="faltaProduccion">Falta producción específica del terreno.</p>
-      <p v-if="faltaArriendo">Falta arriendo anual — completa manualmente:</p>
-      <input
-        v-if="faltaArriendo"
-        type="number"
-        placeholder="Arriendo anual (COP)"
-        class="financial-input"
-        @change="(e) => (store.arriendoManual = Number((e.target as HTMLInputElement).value) || null)"
-      />
+      <p v-if="faltaProduccion">Falta producción específica del terreno — completa manualmente abajo.</p>
+      <p v-if="faltaArriendo">Falta arriendo anual — completa manualmente abajo.</p>
     </div>
 
     <template v-else>
@@ -73,15 +67,28 @@ const arriendoEfectivo = computed(() => store.arriendoManual ?? store.terrainDat
     </template>
 
     <div class="financial-inputs">
-      <div class="financial-row" v-if="store.terrainData?.produccion_especifica">
-        <span class="financial-label">Producción específica</span>
-        <span class="financial-value">{{ store.terrainData.produccion_especifica }} kWh/kWp/día</span>
-      </div>
+      <label class="financial-input-label">
+        Producción específica (kWh/kWp/día) — {{ store.terrainData?.produccion_especifica ? 'de plataforma, editable' : 'no viene de plataforma' }}
+        <input
+          type="number"
+          step="0.0001"
+          :value="produccionEfectiva ?? ''"
+          placeholder="Producción específica (kWh/kWp/día)"
+          class="financial-input"
+          @change="(e) => (store.produccionEspecificaManual = Number((e.target as HTMLInputElement).value) || null)"
+        />
+      </label>
 
-      <div class="financial-row" v-if="arriendoEfectivo">
-        <span class="financial-label">Arriendo anual</span>
-        <span class="financial-value">{{ formatCOP(arriendoEfectivo) }}</span>
-      </div>
+      <label class="financial-input-label">
+        Arriendo anual (COP) — {{ store.terrainData?.arriendo_anual ? 'de plataforma, editable' : 'no viene de plataforma' }}
+        <input
+          type="number"
+          :value="arriendoEfectivo ?? ''"
+          placeholder="Arriendo anual (COP)"
+          class="financial-input"
+          @change="(e) => (store.arriendoManual = Number((e.target as HTMLInputElement).value) || null)"
+        />
+      </label>
 
       <div class="financial-row" v-if="store.terrainData?.precio_hectarea">
         <span class="financial-label">Precio / Ha</span>

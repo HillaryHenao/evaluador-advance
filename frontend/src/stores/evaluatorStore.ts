@@ -22,6 +22,7 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
   const kWp = ref(KWP_DEFAULT)
   const kVA = ref(1000)
   const arriendoManual = ref<number | null>(null)
+  const produccionEspecificaManual = ref<number | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -62,7 +63,7 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
   })
 
   const financialResults = computed<FinancialResults | null>(() => {
-    const produccionEspecifica = terrainData.value?.produccion_especifica
+    const produccionEspecifica = produccionEspecificaManual.value ?? terrainData.value?.produccion_especifica
     const arriendoAnual = arriendoManual.value ?? terrainData.value?.arriendo_anual
     if (!produccionEspecifica || !arriendoAnual) return null
     return calcularFinanzas({
@@ -75,12 +76,12 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
   })
 
   const perProjectFinancials = computed<Record<string, { vpn: number; vpnConBeneficios: number }> | null>(() => {
-    const produccionEspecifica = terrainData.value?.produccion_especifica
+    const produccionEspecifica = produccionEspecificaManual.value ?? terrainData.value?.produccion_especifica
     if (!produccionEspecifica) return null
 
     const resultado: Record<string, { vpn: number; vpnConBeneficios: number }> = {}
     for (const proyecto of terrainData.value?.proyectos ?? []) {
-      const arriendoProyecto = proyecto.arriendo_anual
+      const arriendoProyecto = proyecto.arriendo_anual ?? arriendoManual.value
       if (!arriendoProyecto) continue
 
       // baseCapex/kWp/kVA son magnitudes POR PROYECTO — cada proyecto usa el valor
@@ -158,7 +159,7 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
   }
 
   return {
-    terrainData, criterionValues, perProjectValues, baseCapex, kWp, kVA, arriendoManual,
+    terrainData, criterionValues, perProjectValues, baseCapex, kWp, kVA, arriendoManual, produccionEspecificaManual,
     loading, error, aggregated, financialResults, perProjectResults, perProjectFinancials,
     proyectoNombres, fetchTerrain, setCriterionValue, setPilotesForProyecto, reset,
     capexBaseParaProyecto,

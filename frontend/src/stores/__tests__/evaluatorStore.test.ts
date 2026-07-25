@@ -74,6 +74,42 @@ describe('financialResults', () => {
     expect(store.financialResults).not.toBeNull()
     expect(store.financialResults?.tir).toBeGreaterThan(0)
   })
+
+  it('arriendoManual sobrescribe el arriendo de la plataforma, no solo cuando falta', async () => {
+    vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue(mockTerrain)
+    const store = useEvaluatorStore()
+    await store.fetchTerrain('COLCEST5')
+    store.arriendoManual = 30_000_000
+
+    const esperado = calcularFinanzas({
+      capex: store.aggregated.capexTotal, kWp: store.kWp, kVA: store.kVA,
+      produccionEspecifica: mockTerrain.produccion_especifica!, arriendoAnual: 30_000_000,
+    })
+    expect(store.financialResults!.vpn).toBeCloseTo(esperado.vpn, 6)
+  })
+
+  it('produccionEspecificaManual sobrescribe la producción de la plataforma, no solo cuando falta', async () => {
+    vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue(mockTerrain)
+    const store = useEvaluatorStore()
+    await store.fetchTerrain('COLCEST5')
+    store.produccionEspecificaManual = 5.0
+
+    const esperado = calcularFinanzas({
+      capex: store.aggregated.capexTotal, kWp: store.kWp, kVA: store.kVA,
+      produccionEspecifica: 5.0, arriendoAnual: mockTerrain.arriendo_anual!,
+    })
+    expect(store.financialResults!.vpn).toBeCloseTo(esperado.vpn, 6)
+  })
+
+  it('produccionEspecificaManual permite calcular financialResults cuando la plataforma no la trae', async () => {
+    vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue({ ...mockTerrain, produccion_especifica: null })
+    const store = useEvaluatorStore()
+    await store.fetchTerrain('COLCEST5')
+    expect(store.financialResults).toBeNull()
+
+    store.produccionEspecificaManual = 4.8
+    expect(store.financialResults).not.toBeNull()
+  })
 })
 
 describe('perProjectValues y perProjectResults', () => {
@@ -227,5 +263,54 @@ describe('perProjectFinancials', () => {
     })
 
     expect(store.financialResults!.vpn).toBeCloseTo(esperado.vpn, 6)
+  })
+
+  it('arriendoManual sirve de fallback para un proyecto sin arriendo_anual propio', async () => {
+    const store = useEvaluatorStore()
+    vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue({
+      code: 'COLSANT5', name: 'Test', municipality: 'Giron', or: 'ESSA',
+      nivel_tension: '13.8kV', cluster: 2,
+      ocupacion_cauce: false, ocupacion_cauce_detalle: 'No Requiere',
+      servidumbre: 0, servidumbre_detalle: null,
+      coexistencias: false, coexistencias_detalle: [],
+      produccion_especifica: 4.5, arriendo_anual: null, area_hectareas: 10, precio_hectarea: 2_000_000,
+      proyectos: [
+        { nombre: 'P1', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: null },
+      ],
+    })
+    await store.fetchTerrain('COLSANT5')
+    expect(store.perProjectFinancials).toBeNull()
+
+    store.arriendoManual = 15_000_000
+    expect(store.perProjectFinancials).not.toBeNull()
+    // cluster=2 con un solo proyecto en el terreno aplica el crédito completo (-15M) sin dividir.
+    const esperado = calcularFinanzas({
+      capex: store.baseCapex - 15_000_000, kWp: store.kWp, kVA: store.kVA,
+      produccionEspecifica: 4.5, arriendoAnual: 15_000_000,
+    })
+    expect(store.perProjectFinancials!['P1'].vpn).toBeCloseTo(esperado.vpn, 6)
+  })
+
+  it('produccionEspecificaManual sobrescribe la producción usada por cada proyecto', async () => {
+    const store = useEvaluatorStore()
+    vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue({
+      code: 'COLSANT5', name: 'Test', municipality: 'Giron', or: 'ESSA',
+      nivel_tension: '13.8kV', cluster: 2,
+      ocupacion_cauce: false, ocupacion_cauce_detalle: 'No Requiere',
+      servidumbre: 0, servidumbre_detalle: null,
+      coexistencias: false, coexistencias_detalle: [],
+      produccion_especifica: 4.5, arriendo_anual: 20_000_000, area_hectareas: 10, precio_hectarea: 2_000_000,
+      proyectos: [
+        { nombre: 'P1', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 12_000_000 },
+      ],
+    })
+    await store.fetchTerrain('COLSANT5')
+    store.produccionEspecificaManual = 5.2
+
+    const esperado = calcularFinanzas({
+      capex: store.baseCapex - 15_000_000, kWp: store.kWp, kVA: store.kVA,
+      produccionEspecifica: 5.2, arriendoAnual: 12_000_000,
+    })
+    expect(store.perProjectFinancials!['P1'].vpn).toBeCloseTo(esperado.vpn, 6)
   })
 })
