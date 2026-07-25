@@ -22,8 +22,8 @@ function formatAnios(value: number): string {
   return `${value.toFixed(1)} años`
 }
 
-const faltaProduccion = computed(() => !store.produccionEspecificaManual && !store.terrainData?.produccion_especifica)
-const faltaArriendo = computed(() => !store.arriendoManual && !store.terrainData?.arriendo_anual)
+const faltaProduccion = computed(() => store.produccionEspecificaManual == null && store.terrainData?.produccion_especifica == null)
+const faltaArriendo = computed(() => store.arriendoManual == null && store.terrainData?.arriendo_anual == null)
 const arriendoEfectivo = computed(() => store.arriendoManual ?? store.terrainData?.arriendo_anual ?? null)
 const produccionEfectiva = computed(() => store.produccionEspecificaManual ?? store.terrainData?.produccion_especifica ?? null)
 </script>
@@ -32,37 +32,42 @@ const produccionEfectiva = computed(() => store.produccionEspecificaManual ?? st
   <aside class="financial-panel">
     <h2 class="financial-title">Resultados financieros</h2>
 
-    <div v-if="!store.financialResults" class="financial-empty">
+    <div v-if="!store.perProjectFinancials" class="financial-empty">
       <p v-if="faltaProduccion">Falta producción específica del terreno — completa manualmente abajo.</p>
       <p v-if="faltaArriendo">Falta arriendo anual — completa manualmente abajo.</p>
     </div>
 
     <template v-else>
-      <div class="financial-row">
-        <span class="financial-label">TIR</span>
-        <span class="financial-value">{{ formatPct(store.financialResults.tir) }}</span>
-      </div>
-      <div class="financial-row">
-        <span class="financial-label">TIR c. beneficios tributarios</span>
-        <span class="financial-value financial-value--highlight">{{ formatPct(store.financialResults.tirConBeneficios) }}</span>
-      </div>
-      <div class="financial-divider" />
-      <div class="financial-row">
-        <span class="financial-label">VPN</span>
-        <span class="financial-value">{{ formatCOP(store.financialResults.vpn) }}</span>
-      </div>
-      <div class="financial-row">
-        <span class="financial-label">VPN c. beneficios</span>
-        <span class="financial-value financial-value--highlight">{{ formatCOP(store.financialResults.vpnConBeneficios) }}</span>
-      </div>
-      <div class="financial-divider" />
-      <div class="financial-row">
-        <span class="financial-label">Payback</span>
-        <span class="financial-value">{{ formatAnios(store.financialResults.paybackAnios) }}</span>
-      </div>
-      <div class="financial-row">
-        <span class="financial-label">Payback c. beneficios</span>
-        <span class="financial-value financial-value--highlight">{{ formatAnios(store.financialResults.paybackConBeneficiosAnios) }}</span>
+      <div v-for="nombre in store.proyectoNombres" :key="nombre" class="financial-project">
+        <div class="financial-project-title">{{ nombre }}</div>
+
+        <template v-if="store.perProjectFinancials[nombre]">
+          <div class="financial-row">
+            <span class="financial-label">TIR</span>
+            <span class="financial-value">{{ formatPct(store.perProjectFinancials[nombre].tir) }}</span>
+          </div>
+          <div class="financial-row">
+            <span class="financial-label">TIR c. beneficios</span>
+            <span class="financial-value financial-value--highlight">{{ formatPct(store.perProjectFinancials[nombre].tirConBeneficios) }}</span>
+          </div>
+          <div class="financial-row">
+            <span class="financial-label">VPN</span>
+            <span class="financial-value">{{ formatCOP(store.perProjectFinancials[nombre].vpn) }}</span>
+          </div>
+          <div class="financial-row">
+            <span class="financial-label">VPN c. beneficios</span>
+            <span class="financial-value financial-value--highlight">{{ formatCOP(store.perProjectFinancials[nombre].vpnConBeneficios) }}</span>
+          </div>
+          <div class="financial-row">
+            <span class="financial-label">Payback</span>
+            <span class="financial-value">{{ formatAnios(store.perProjectFinancials[nombre].paybackAnios) }}</span>
+          </div>
+          <div class="financial-row">
+            <span class="financial-label">Payback c. beneficios</span>
+            <span class="financial-value financial-value--highlight">{{ formatAnios(store.perProjectFinancials[nombre].paybackConBeneficiosAnios) }}</span>
+          </div>
+        </template>
+        <p v-else class="financial-project-empty">Falta arriendo anual de este proyecto.</p>
       </div>
     </template>
 
@@ -147,6 +152,17 @@ const produccionEfectiva = computed(() => store.produccionEspecificaManual ?? st
 .financial-value--highlight { color: var(--purple); }
 
 .financial-divider { height: 1px; background: var(--border); margin: 0.2rem 0; }
+
+.financial-project { padding: 0.6rem 0; }
+.financial-project:not(:last-child) { border-bottom: 1px dashed var(--border); }
+.financial-project-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.4rem;
+  overflow-wrap: break-word;
+}
+.financial-project-empty { font-size: 0.75rem; color: var(--muted); }
 
 .financial-empty {
   font-size: 0.78rem;

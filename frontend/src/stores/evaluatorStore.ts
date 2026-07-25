@@ -65,7 +65,8 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
   const financialResults = computed<FinancialResults | null>(() => {
     const produccionEspecifica = produccionEspecificaManual.value ?? terrainData.value?.produccion_especifica
     const arriendoAnual = arriendoManual.value ?? terrainData.value?.arriendo_anual
-    if (!produccionEspecifica || !arriendoAnual) return null
+    // 0 es un arriendo válido (ej. COLBOYT147) — solo null/undefined significa "falta el dato".
+    if (produccionEspecifica == null || arriendoAnual == null) return null
     return calcularFinanzas({
       capex: aggregated.value.capexTotal,
       kWp: kWp.value * projectCount.value,
@@ -75,14 +76,15 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
     })
   })
 
-  const perProjectFinancials = computed<Record<string, { vpn: number; vpnConBeneficios: number }> | null>(() => {
+  const perProjectFinancials = computed<Record<string, FinancialResults> | null>(() => {
     const produccionEspecifica = produccionEspecificaManual.value ?? terrainData.value?.produccion_especifica
-    if (!produccionEspecifica) return null
+    if (produccionEspecifica == null) return null
 
-    const resultado: Record<string, { vpn: number; vpnConBeneficios: number }> = {}
+    const resultado: Record<string, FinancialResults> = {}
     for (const proyecto of terrainData.value?.proyectos ?? []) {
       const arriendoProyecto = proyecto.arriendo_anual ?? arriendoManual.value
-      if (!arriendoProyecto) continue
+      // 0 es un arriendo válido (ej. COLBOYT147) — solo null/undefined significa "falta el dato".
+      if (arriendoProyecto == null) continue
 
       // baseCapex/kWp/kVA son magnitudes POR PROYECTO — cada proyecto usa el valor
       // completo, sin dividir. Solo se le suma el subtotal de sobrecostos fijos propio
@@ -94,14 +96,13 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
         baseCapex: baseCapex.value, kWp: kWp.value, projectCount: 1,
       }).totalSobrecostoFijo
 
-      const finanzas = calcularFinanzas({
+      resultado[proyecto.nombre] = calcularFinanzas({
         capex: capexProyecto,
         kWp: kWp.value,
         kVA: kVA.value,
         produccionEspecifica,
         arriendoAnual: arriendoProyecto,
       })
-      resultado[proyecto.nombre] = { vpn: finanzas.vpn, vpnConBeneficios: finanzas.vpnConBeneficios }
     }
     return Object.keys(resultado).length > 0 ? resultado : null
   })

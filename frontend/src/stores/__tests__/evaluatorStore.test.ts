@@ -101,6 +101,13 @@ describe('financialResults', () => {
     expect(store.financialResults!.vpn).toBeCloseTo(esperado.vpn, 6)
   })
 
+  it('arriendo_anual en $0 (real, no ausente) SÍ calcula financialResults — 0 no es "falta el dato"', async () => {
+    vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue({ ...mockTerrain, arriendo_anual: 0 })
+    const store = useEvaluatorStore()
+    await store.fetchTerrain('COLCEST5')
+    expect(store.financialResults).not.toBeNull()
+  })
+
   it('produccionEspecificaManual permite calcular financialResults cuando la plataforma no la trae', async () => {
     vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue({ ...mockTerrain, produccion_especifica: null })
     const store = useEvaluatorStore()
@@ -203,6 +210,35 @@ describe('perProjectFinancials', () => {
     expect(store.perProjectFinancials!['P1'].vpn).not.toBe(store.perProjectFinancials!['P2'].vpn)
   })
 
+  it('incluye TIR y Payback completos por proyecto, no solo VPN', async () => {
+    const store = useEvaluatorStore()
+    vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue({
+      code: 'COLSANT5', name: 'Test', municipality: 'Giron', or: 'ESSA',
+      nivel_tension: '13.8kV', cluster: 2,
+      ocupacion_cauce: false, ocupacion_cauce_detalle: 'No Requiere',
+      servidumbre: 0, servidumbre_detalle: null,
+      coexistencias: false, coexistencias_detalle: [],
+      produccion_especifica: 4.5, arriendo_anual: 20_000_000, area_hectareas: 10, precio_hectarea: 2_000_000,
+      proyectos: [
+        { nombre: 'P1', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 12_000_000 },
+        { nombre: 'P2', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 8_000_000 },
+      ],
+    })
+    await store.fetchTerrain('COLSANT5')
+
+    const esperadoP1 = calcularFinanzas({
+      capex: store.baseCapex - 7_500_000, kWp: store.kWp, kVA: store.kVA,
+      produccionEspecifica: 4.5, arriendoAnual: 12_000_000,
+    })
+
+    expect(store.perProjectFinancials!['P1'].tir).toBeCloseTo(esperadoP1.tir, 6)
+    expect(store.perProjectFinancials!['P1'].tirConBeneficios).toBeCloseTo(esperadoP1.tirConBeneficios, 6)
+    expect(store.perProjectFinancials!['P1'].paybackAnios).toBeCloseTo(esperadoP1.paybackAnios, 6)
+    expect(store.perProjectFinancials!['P1'].paybackConBeneficiosAnios).toBeCloseTo(esperadoP1.paybackConBeneficiosAnios, 6)
+    // P1 y P2 tienen arriendo distinto → su TIR también debe diferir (no solo el VPN).
+    expect(store.perProjectFinancials!['P1'].tir).not.toBe(store.perProjectFinancials!['P2'].tir)
+  })
+
   it('mesa_fija usa un CAPEX base distinto (3.750M) al de los demás proyectos (4.000M)', async () => {
     const store = useEvaluatorStore()
     vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue({
@@ -263,6 +299,27 @@ describe('perProjectFinancials', () => {
     })
 
     expect(store.financialResults!.vpn).toBeCloseTo(esperado.vpn, 6)
+  })
+
+  it('arriendo_anual en $0 por proyecto (real, no ausente) SÍ incluye ese proyecto — caso real COLBOYT147', async () => {
+    const store = useEvaluatorStore()
+    vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue({
+      code: 'COLBOYT147', name: 'Test', municipality: 'Tunja', or: 'EBSA',
+      nivel_tension: '13.8kV', cluster: 2,
+      ocupacion_cauce: true, ocupacion_cauce_detalle: 'Pendiente',
+      servidumbre: null, servidumbre_detalle: { tipo: 'Ajena', estado: 'Pendiente' },
+      coexistencias: false, coexistencias_detalle: [],
+      produccion_especifica: 4.117, arriendo_anual: 0, area_hectareas: null, precio_hectarea: 8_255_000,
+      proyectos: [
+        { nombre: 'P1', distancia_via: 20, distancia_red: 190, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: 'Exonerado', numero_arboles: 0, tipo_estructura: 'tracker', arriendo_anual: 0 },
+        { nombre: 'P2', distancia_via: 20, distancia_red: 190, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: 'Exonerado', numero_arboles: 0, tipo_estructura: 'mesa_fija', arriendo_anual: 0 },
+      ],
+    })
+    await store.fetchTerrain('COLBOYT147')
+
+    expect(store.perProjectFinancials).not.toBeNull()
+    expect(store.perProjectFinancials!['P1']).toBeDefined()
+    expect(store.perProjectFinancials!['P2']).toBeDefined()
   })
 
   it('arriendoManual sirve de fallback para un proyecto sin arriendo_anual propio', async () => {

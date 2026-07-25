@@ -14,6 +14,13 @@ function tipoEstructuraLabel(nombre: string): string | null {
 
 const nivelTension = computed(() => store.terrainData?.nivel_tension ?? null)
 
+// scope 'terreno_dividido': el monto mostrado por proyecto es su parte de un costo
+// repartido entre todos los proyectos del terreno (costoBase / N), no algo propio de él.
+const criterioScope = new Map(loadCriteria().map(c => [c.id, c.scope]))
+function esRepartido(id: string): boolean {
+  return criterioScope.get(id) === 'terreno_dividido'
+}
+
 function formatCOP(value: number): string {
   const sign = value < 0 ? '-' : ''
   const abs = Math.abs(value)
@@ -60,6 +67,8 @@ const proyectos = computed(() => {
       capexBase,
       capexTotal: capexBase + aggregated.totalSobrecostoFijo,
       riesgoMonto: aggregated.totalRetraso + aggregated.totalRiesgoCosto,
+      tir: store.perProjectFinancials?.[nombre]?.tir ?? null,
+      paybackAnios: store.perProjectFinancials?.[nombre]?.paybackAnios ?? null,
       vpn: store.perProjectFinancials?.[nombre]?.vpn ?? null,
       vpnConBeneficios: store.perProjectFinancials?.[nombre]?.vpnConBeneficios ?? null,
     }
@@ -89,12 +98,6 @@ const proyectos = computed(() => {
       Riesgo no incluido en el CAPEX
     </div>
 
-    <div v-if="store.financialResults" class="breakdown-financials-note">
-      <span>TIR: {{ formatPct(store.financialResults.tir) }}</span>
-      <span>Payback: {{ formatAnios(store.financialResults.paybackAnios) }}</span>
-      <span class="breakdown-note-text">(igual para todos los proyectos del terreno)</span>
-    </div>
-
     <div class="breakdown-grid">
       <div v-for="p in proyectos" :key="p.nombre" class="breakdown-card">
         <div class="breakdown-card-title">{{ p.nombre }}</div>
@@ -109,7 +112,13 @@ const proyectos = computed(() => {
         </div>
         <div v-for="item in p.fijoItems" :key="item.id" class="breakdown-item-row">
           <span class="breakdown-item-label">{{ item.label }}</span>
-          <span class="breakdown-item-value">{{ formatCOP(item.sobrecosto) }}</span>
+          <span
+            class="breakdown-item-value"
+            :class="{
+              'breakdown-item-value--ahorro': item.sobrecosto < 0,
+              'breakdown-item-value--repartido': item.sobrecosto >= 0 && esRepartido(item.id),
+            }"
+          >{{ formatCOP(item.sobrecosto) }}</span>
         </div>
         <div class="breakdown-row breakdown-row--subtotal">
           <span class="breakdown-label">Fijos</span>
@@ -137,13 +146,21 @@ const proyectos = computed(() => {
           </div>
         </template>
 
-        <div v-if="p.vpn !== null" class="breakdown-row breakdown-row--total">
+        <div v-if="p.tir !== null" class="breakdown-row breakdown-row--total">
+          <span class="breakdown-label">TIR</span>
+          <span class="breakdown-value">{{ formatPct(p.tir) }}</span>
+        </div>
+        <div v-if="p.vpn !== null" class="breakdown-row">
           <span class="breakdown-label">VPN</span>
           <span class="breakdown-value">{{ formatCOP(p.vpn) }}</span>
         </div>
         <div v-if="p.vpnConBeneficios !== null" class="breakdown-row">
           <span class="breakdown-label">VPN c. beneficios</span>
           <span class="breakdown-value breakdown-value--highlight">{{ formatCOP(p.vpnConBeneficios) }}</span>
+        </div>
+        <div v-if="p.paybackAnios !== null" class="breakdown-row">
+          <span class="breakdown-label">Payback</span>
+          <span class="breakdown-value">{{ formatAnios(p.paybackAnios) }}</span>
         </div>
       </div>
     </div>
@@ -176,8 +193,8 @@ const proyectos = computed(() => {
 .breakdown-note-text { font-size: 0.72rem; font-weight: 500; color: var(--muted); }
 
 .breakdown-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 1rem;
 }
 
@@ -187,6 +204,8 @@ const proyectos = computed(() => {
   border-radius: 14px;
   padding: 1rem 1.25rem;
   box-shadow: 0 2px 8px rgba(145, 91, 216, 0.07);
+  min-width: 240px;
+  flex: 0 1 auto;
 }
 .breakdown-card-title {
   font-size: 0.82rem;
@@ -194,6 +213,7 @@ const proyectos = computed(() => {
   color: var(--text);
   padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--border);
+  white-space: nowrap;
 }
 .breakdown-card-subtitle {
   display: inline-flex;
@@ -228,6 +248,8 @@ const proyectos = computed(() => {
 .breakdown-item-label { color: var(--text-mid); font-weight: 500; }
 .breakdown-item-value { color: var(--purple); font-weight: 600; white-space: nowrap; }
 .breakdown-item-value--riesgo { color: var(--warn); }
+.breakdown-item-value--ahorro { color: var(--green); font-weight: 700; }
+.breakdown-item-value--repartido { color: var(--sky); }
 
 .breakdown-row--subtotal {
   border-top: 1px dashed var(--border);
