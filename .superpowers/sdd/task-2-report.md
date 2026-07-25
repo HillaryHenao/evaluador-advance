@@ -1,163 +1,63 @@
-# Task 2 Implementation Report: Frontend types — CriterionScope, ProyectoData, EvalContext.projectCount
+# Task 2 Report — Frontend: consume `aprovechamiento_forestal_detalle` in `CriterionCard.vue`
 
-## Status
-**DONE_WITH_CONCERNS** — Implementation complete and tested, with expected type errors in files outside this task's scope (Task 4 and 5 will resolve them).
+## What was implemented
 
-## What Was Implemented
+- `frontend/src/types/index.ts`: added `aprovechamiento_forestal_detalle: string | null` to `ProyectoData`, per Task 1's new backend field.
+- `frontend/src/components/CriterionCard.vue`: added a `detalleParaProyecto(nombre)` helper that returns the resolved forestal-license string only for the `aprovechamiento_forestal` criterion (`null` for every other criterion), wired it into `proyectoRows` as `row.detalle`, and changed the template's value cell to fall back to `row.detalle` before the `'—'` placeholder: `{{ row.value ?? row.detalle ?? '—' }}`.
+- `frontend/src/stores/__tests__/evaluatorStore.test.ts`: added `aprovechamiento_forestal_detalle` to the 5 mock `proyectos` object literals (1 in `mockTerrain`, 4 across the `perProjectValues`/`perProjectResults`/`perProjectFinancials` describe blocks) so they satisfy the widened `ProyectoData` type.
 
-### Step 1: Updated `frontend/src/types/index.ts`
-- Added `CriterionScope` type definition: `'proyecto' | 'terreno_dividido' | 'terreno_multiplicado' | 'terreno_no_dividido'`
-- Added `ProyectoData` interface with fields: `nombre`, `distancia_via`, `distancia_red`, `aprovechamiento_forestal`, `numero_arboles`, `tipo_estructura`
-- Updated `EvalContext` interface to include optional `projectCount?: number` field
-- Updated `CriterionModule` interface to include required `scope: CriterionScope` field
-- Updated `TerrainData` interface:
-  - Removed project-level fields: `distancia_via`, `distancia_red`, `tipo_estructura`, `numero_arboles`, `aprovechamiento_forestal`, `aprovechamiento_forestal_detalle`
-  - Added new field: `proyectos: ProyectoData[]`
-- Deleted `ProyectoEstadoDetalle` interface (no longer used)
+All three diffs matched the brief's find/replace blocks verbatim.
 
-### Step 2: Added `scope` field to all 18 criteria modules
-Updated the following files with appropriate `scope` values:
+## Verification
 
-**scope: 'proyecto'** (6 files):
-- `frontend/src/criteria/distancia_via.ts`
-- `frontend/src/criteria/distancia_red.ts`
-- `frontend/src/criteria/numero_arboles.ts`
-- `frontend/src/criteria/aprovechamiento_forestal.ts`
-- `frontend/src/criteria/pilotes.ts`
-- `frontend/src/criteria/tipo_estructura.ts`
+### Type-check
 
-**scope: 'terreno_dividido'** (10 files):
-- `frontend/src/criteria/corte.ts`
-- `frontend/src/criteria/lleno.ts`
-- `frontend/src/criteria/obras_hidraulicas.ts`
-- `frontend/src/criteria/ocupacion_cauce.ts`
-- `frontend/src/criteria/coexistencias.ts`
-- `frontend/src/criteria/comunidad.ts`
-- `frontend/src/criteria/or.ts`
-- `frontend/src/criteria/propietario.ts`
-- `frontend/src/criteria/servidumbre.ts`
-- `frontend/src/criteria/amenazas.ts`
+Command (from `frontend/`): `npx vue-tsc -b`
 
-**scope: 'terreno_multiplicado'** (1 file):
-- `frontend/src/criteria/nivel_tension.ts`
-
-**scope: 'terreno_no_dividido'** (1 file):
-- `frontend/src/criteria/cluster.ts`
-
-### Step 3: Added scope coverage test
-Added test case to `frontend/src/engine/__tests__/evaluatorEngine.test.ts`:
-```typescript
-it('todos tienen un scope válido', () => {
-  const criteria = loadCriteria()
-  const validScopes = ['proyecto', 'terreno_dividido', 'terreno_multiplicado', 'terreno_no_dividido']
-  for (const c of criteria) {
-    expect(validScopes).toContain(c.scope)
-  }
-})
+```
+vite.config.ts(13,3): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Object literal may only specify known properties, and 'test' does not exist in type 'UserConfigExport'.
 ```
 
-## Testing Results
+Exactly 1 error, matching the expected pre-existing `vite.config.ts` error per the brief (Steps 4 and 6).
 
-### Step 2b: Verification
-Verified all 18 criteria files have `scope:` field using grep — found exactly 18 files with scope, zero files missing it.
+### Test suite
 
-### Step 4: Test execution
-```
-evaluatorEngine.test.ts: 11/11 tests PASS ✓ (10 existing + 1 new scope coverage test)
-```
-The new test specifically validates that all loaded criteria have a valid scope value.
+Command (from `frontend/`): `npx vitest run`
 
-### Step 5: Full suite and type-check results
-
-**vitest run (evaluator-related tests):**
 ```
-Test Files: 2 passed (evaluatorEngine + criteria)
-Tests: 55 passed
-```
-All evaluator and criteria tests pass. Pre-existing test failures in authStore are unrelated to this task.
-
-**npx vue-tsc -b results:**
-```
-Errors found: 4 total
-- 2 pre-existing unrelated errors (as expected):
-  × evaluatorEngine.test.ts(10,3): Unused '@ts-expect-error' directive
-  × vite.config.ts(13,3): No overload matches this call (UserConfigExport test config)
-  
-- 2 expected new errors from TerrainData schema changes (will be fixed by Task 4-5):
-  × CriterionCard.vue(83,29): Property 'aprovechamiento_forestal_detalle' does not exist
-  × evaluatorStore.test.ts(11,3): Property 'distancia_via' does not exist in TerrainData
+ Test Files  6 passed (6)
+      Tests  86 passed (86)
 ```
 
-These errors are expected because Task 1 changed the API response shape, and:
-- Task 4 (evaluatorStore.ts) will wire the new `proyectos` field into the store
-- Task 5 (CriterionCard.vue) will update the UI to reference the new per-project fields
+All 86 tests pass, unchanged count — matches the brief's expectation exactly (this task only satisfies types/adds display fallback, no assertion changes).
 
-This task correctly introduced the schema changes; downstream consumers will be updated in later tasks.
+### Live/browser verification (Step 7)
 
-## Files Changed
+Not performed. No dev server was running in this environment and no browser-driving tool was available in this session. Per the brief's own fallback instruction ("If no browser-driving tool is available, state plainly in the report that this step needs human verification — do not guess at the visual outcome"), this is called out here rather than guessed at.
 
-**Modified (20 files total):**
-- frontend/src/types/index.ts (4 sections)
-- frontend/src/criteria/distancia_via.ts
-- frontend/src/criteria/distancia_red.ts
-- frontend/src/criteria/numero_arboles.ts
-- frontend/src/criteria/aprovechamiento_forestal.ts
-- frontend/src/criteria/pilotes.ts
-- frontend/src/criteria/tipo_estructura.ts
-- frontend/src/criteria/corte.ts
-- frontend/src/criteria/lleno.ts
-- frontend/src/criteria/obras_hidraulicas.ts
-- frontend/src/criteria/ocupacion_cauce.ts
-- frontend/src/criteria/coexistencias.ts
-- frontend/src/criteria/comunidad.ts
-- frontend/src/criteria/or.ts
-- frontend/src/criteria/propietario.ts
-- frontend/src/criteria/servidumbre.ts
-- frontend/src/criteria/amenazas.ts
-- frontend/src/criteria/nivel_tension.ts
-- frontend/src/criteria/cluster.ts
-- frontend/src/engine/__tests__/evaluatorEngine.test.ts
+**Needs human verification:** with both dev servers running, search `COLBOYT147` and confirm the "Aprovechamiento forestal" criterion card shows **"Exonerado"** per project instead of a blank dash, with the cost column unchanged (`—` / 0).
 
-## Self-Review Findings
+## Files changed
 
-**Completeness:** ✓
-- All 18 criteria files updated with scope field
-- New types (CriterionScope, ProyectoData) added and integrated
-- EvalContext and CriterionModule interfaces updated
-- TerrainData schema updated per spec
-- ProyectoEstadoDetalle deleted as specified
-- Test coverage added for scope field
+- `frontend/src/types/index.ts`
+- `frontend/src/components/CriterionCard.vue`
+- `frontend/src/stores/__tests__/evaluatorStore.test.ts`
 
-**Quality:** ✓
-- Code follows existing patterns and style (no restructuring of criteria files)
-- Changes are minimal and focused (only added scope, no other modifications)
-- Test correctly validates all scope values are valid
-- Type definitions match the new API response shape from Task 1
+## Commit
 
-**Discipline:** ✓
-- Stayed within task scope — only modified files specified in the brief
-- No changes to UI or evaluation logic (that's Tasks 3-6)
-- No unauthorized modifications to test fixtures or other code
+```
+d90081a feat: show resolved aprovechamiento forestal status (e.g. Exonerado) per project
+3 files changed, 17 insertions(+), 10 deletions(-)
+```
 
-**Type Safety:** ✓
-- New `scope` field is required on CriterionModule (not optional)
-- All 18 criteria modules provide the field
-- CriterionScope type is narrow and explicit (4 valid values)
-- `projectCount` is optional on EvalContext to avoid breaking existing code
+## Self-review
+
+- **Completeness**: Steps 1, 3, and 5 (the actual code changes) were already present in the working tree at session start and matched the brief's exact find/replace blocks; this session's work was verifying (Steps 2, 4, 6) and committing (Step 8). Step 7 (browser verification) is explicitly deferred to a human per the brief's allowed fallback.
+- **Quality**: `detalleParaProyecto` is scoped narrowly to the one criterion it applies to (`aprovechamiento_forestal`), returning `null` for all others — so `row.detalle` is a no-op fallback everywhere else, exactly as the brief's comment states.
+- **Discipline**: Only the three files named in the brief were staged/committed. The unrelated pre-existing modifications to `.superpowers/sdd/progress.md`, `task-1-brief.md`, `task-1-report.md`, and `task-2-brief.md` were left unstaged, same pattern as Task 1's report.
 
 ## Concerns
 
-**Expected type errors (not failures):** The type-check output shows 2 new errors in CriterionCard.vue and evaluatorStore.test.ts referencing removed TerrainData fields. These are expected because:
-1. Task 1 changed the API shape to return `proyectos: list[dict]` instead of top-level fields
-2. This task propagates that change into the frontend type system
-3. Task 4 and Task 5 are responsible for wiring up the new fields and removing references to old ones
-
-This is **not** a failure — it's the correct progression of the plan. The schema is now correct; downstream consumers will be updated in order.
-
-## Commit
-```
-a2ddd9d feat: add scope classification to CriterionModule, ProyectoData type
-```
-
-## Next Steps
-Ready for Task 3 (Frontend engine — evaluateScoped). The type system is now stable and type-safe for per-project evaluation logic.
+None beyond the deferred live verification (Step 7), which requires a human with a running dev server/browser.

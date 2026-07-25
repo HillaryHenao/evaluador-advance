@@ -1,31 +1,17 @@
-### Task 2: Frontend — CAPEX/kWp/kVA/arriendo scale by N (general) instead of dividing (per-project)
+### Task 2: Frontend — consume `aprovechamiento_forestal_detalle` in `CriterionCard.vue`
 
 **Files:**
 - Modify: `frontend/src/types/index.ts`
-- Modify: `frontend/src/stores/evaluatorStore.ts`
+- Modify: `frontend/src/components/CriterionCard.vue`
 - Modify: `frontend/src/stores/__tests__/evaluatorStore.test.ts`
-- Modify: `frontend/src/components/ProjectBreakdownPanel.vue`
 
 **Interfaces:**
-- Consumes: `ProyectoData` (Task 1's backend shape, now including `arriendo_anual: number | null`).
-- Produces: nothing consumed by other tasks — this is the last task of this plan.
+- Consumes: `ProyectoData.aprovechamiento_forestal_detalle` (Task 1's backend field).
+- Produces: nothing consumed by later tasks — Task 3 (cluster) is independent of this one.
 
-- [ ] **Step 1: Add `arriendo_anual` to `ProyectoData`**
+- [ ] **Step 1: Add the field to `ProyectoData`**
 
 Find (in `frontend/src/types/index.ts`):
-
-```ts
-export interface ProyectoData {
-  nombre: string
-  distancia_via: number | null
-  distancia_red: number | null
-  aprovechamiento_forestal: string | null
-  numero_arboles: number | null
-  tipo_estructura: string | null
-}
-```
-
-Replace with:
 
 ```ts
 export interface ProyectoData {
@@ -39,38 +25,30 @@ export interface ProyectoData {
 }
 ```
 
-- [ ] **Step 2: Write the failing test for `perProjectFinancials`' new behavior**
-
-Find (in `frontend/src/stores/__tests__/evaluatorStore.test.ts`, top of file):
+Replace:
 
 ```ts
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { setActivePinia, createPinia } from 'pinia'
-import { useEvaluatorStore } from '../evaluatorStore'
-import * as terrainService from '@/services/terrainService'
-import type { TerrainData } from '@/types'
+export interface ProyectoData {
+  nombre: string
+  distancia_via: number | null
+  distancia_red: number | null
+  aprovechamiento_forestal: string | null
+  aprovechamiento_forestal_detalle: string | null
+  numero_arboles: number | null
+  tipo_estructura: string | null
+  arriendo_anual: number | null
+}
 ```
 
-Replace with:
+- [ ] **Step 2: Run the type-check to see the new errors**
 
-```ts
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { setActivePinia, createPinia } from 'pinia'
-import { useEvaluatorStore } from '../evaluatorStore'
-import * as terrainService from '@/services/terrainService'
-import { calcularFinanzas } from '@/engine/financialEngine'
-import type { TerrainData } from '@/types'
-```
+Run (from `frontend/`): `npx vue-tsc -b`
 
-Find `mockTerrain`'s `proyectos` array:
+Expected: new errors in `frontend/src/stores/__tests__/evaluatorStore.test.ts` — 5 object literals typed as `ProyectoData` are now missing the required `aprovechamiento_forestal_detalle` property.
 
-```ts
-  proyectos: [
-    { nombre: 'Test Proyecto', distancia_via: 120, distancia_red: 350, aprovechamiento_forestal: null, numero_arboles: 5, tipo_estructura: 'Tracker' },
-  ],
-```
+- [ ] **Step 3: Fix the 5 mock `proyectos` arrays in `evaluatorStore.test.ts`**
 
-Replace with:
+Find (top-level `mockTerrain`):
 
 ```ts
   proyectos: [
@@ -78,16 +56,15 @@ Replace with:
   ],
 ```
 
-Find the `proyectos` array inside the `'perProjectValues y perProjectResults'` describe block's first test (`'se autopobla desde terrainData.proyectos al buscar terreno'`):
+Replace:
 
 ```ts
-      proyectos: [
-        { nombre: 'P1', distancia_via: 10, distancia_red: 30, aprovechamiento_forestal: 'visita', numero_arboles: 2, tipo_estructura: 'tracker' },
-        { nombre: 'P2', distancia_via: 12, distancia_red: 28, aprovechamiento_forestal: null, numero_arboles: 0, tipo_estructura: 'mesa_fija' },
-      ],
+  proyectos: [
+    { nombre: 'Test Proyecto', distancia_via: 120, distancia_red: 350, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: 5, tipo_estructura: 'Tracker', arriendo_anual: 26275000 },
+  ],
 ```
 
-Replace with:
+Find (inside the `'perProjectValues y perProjectResults'` describe block, first test — `'se autopobla desde terrainData.proyectos al buscar terreno'`):
 
 ```ts
       proyectos: [
@@ -96,16 +73,16 @@ Replace with:
       ],
 ```
 
-Find the `proyectos` array inside the `'perProjectResults refleja la división terreno_dividido entre proyectos'` test:
+Replace:
 
 ```ts
       proyectos: [
-        { nombre: 'P1', distancia_via: 10, distancia_red: 30, aprovechamiento_forestal: null, numero_arboles: 0, tipo_estructura: 'tracker' },
-        { nombre: 'P2', distancia_via: 12, distancia_red: 28, aprovechamiento_forestal: null, numero_arboles: 0, tipo_estructura: 'mesa_fija' },
+        { nombre: 'P1', distancia_via: 10, distancia_red: 30, aprovechamiento_forestal: 'visita', aprovechamiento_forestal_detalle: 'Visita', numero_arboles: 2, tipo_estructura: 'tracker', arriendo_anual: 12_000_000 },
+        { nombre: 'P2', distancia_via: 12, distancia_red: 28, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: 'Exonerado', numero_arboles: 0, tipo_estructura: 'mesa_fija', arriendo_anual: 8_000_000 },
       ],
 ```
 
-Replace with:
+Find (inside the `'perProjectResults refleja la división terreno_dividido entre proyectos'` test):
 
 ```ts
       proyectos: [
@@ -114,293 +91,134 @@ Replace with:
       ],
 ```
 
-Find the entire `describe('perProjectFinancials', ...)` block:
+Replace:
 
 ```ts
-describe('perProjectFinancials', () => {
-  it('divide capex, kWp, kVA y arriendo entre N proyectos para el VPN', async () => {
-    const store = useEvaluatorStore()
-    vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue({
-      code: 'COLSANT5', name: 'Test', municipality: 'Giron', or: 'ESSA',
-      nivel_tension: '13.8kV', cluster: 2,
-      ocupacion_cauce: false, ocupacion_cauce_detalle: 'No Requiere',
-      servidumbre: 0, servidumbre_detalle: null,
-      coexistencias: false, coexistencias_detalle: [],
-      produccion_especifica: 4.5, arriendo_anual: 20_000_000,
       proyectos: [
-        { nombre: 'P1', distancia_via: 10, distancia_red: 30, aprovechamiento_forestal: null, numero_arboles: 0, tipo_estructura: 'tracker' },
-        { nombre: 'P2', distancia_via: 12, distancia_red: 28, aprovechamiento_forestal: null, numero_arboles: 0, tipo_estructura: 'mesa_fija' },
+        { nombre: 'P1', distancia_via: 10, distancia_red: 30, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: 0, tipo_estructura: 'tracker', arriendo_anual: 12_000_000 },
+        { nombre: 'P2', distancia_via: 12, distancia_red: 28, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: 0, tipo_estructura: 'mesa_fija', arriendo_anual: 8_000_000 },
       ],
-    })
-    await store.fetchTerrain('COLSANT5')
-
-    expect(store.perProjectFinancials).not.toBeNull()
-    const p1 = store.perProjectFinancials!['P1'].vpn
-    const p2 = store.perProjectFinancials!['P2'].vpn
-    // Ambos proyectos reciben la misma división (N=2) con datos simétricos, así que
-    // deben coincidir exactamente entre sí.
-    expect(p1).toBe(p2)
-    // No se espera igualdad exacta con financialResults.vpn / 2: calcularFinanzas() incluye
-    // costos absolutos que NO escalan con capex/kWp/kVA (servicios públicos, mantenimiento
-    // de tracker, reemplazo de inversores — ver financialEngine.ts). Al dividir un terreno
-    // en N proyectos esos costos fijos se pagan N veces en vez de dividirse entre N, así que
-    // el VPN por proyecto queda por debajo de (vpn total / N), no exactamente en la mitad.
-    // Se verifica un rango razonable en lugar de una igualdad exacta.
-    const mitad = store.financialResults!.vpn / 2
-    expect(p1).toBeGreaterThan(mitad * 0.5)
-    expect(p1).toBeLessThan(mitad)
-  })
-})
 ```
 
-Replace with:
+The exact same `proyectos` array (with `distancia_via: null` for both projects) appears **twice** in this file — once in each test inside `describe('perProjectFinancials', ...)`. Apply this same find/replace to **both** occurrences:
+
+Find (appears twice):
 
 ```ts
-describe('perProjectFinancials', () => {
-  it('cada proyecto usa su propio capex/kWp/kVA/arriendo COMPLETOS, sin dividir entre N', async () => {
-    const store = useEvaluatorStore()
-    vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue({
-      code: 'COLSANT5', name: 'Test', municipality: 'Giron', or: 'ESSA',
-      nivel_tension: '13.8kV', cluster: 2,
-      ocupacion_cauce: false, ocupacion_cauce_detalle: 'No Requiere',
-      servidumbre: 0, servidumbre_detalle: null,
-      coexistencias: false, coexistencias_detalle: [],
-      produccion_especifica: 4.5, arriendo_anual: 20_000_000,
-      // Sin datos de scope 'proyecto' (todo null) para que el subtotal de sobrecostos
-      // fijos de cada proyecto sea 0 y el capex de cada uno sea exactamente store.baseCapex
-      // — así el test puede verificar el valor exacto sin recalcular fórmulas de criterios.
       proyectos: [
         { nombre: 'P1', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 12_000_000 },
         { nombre: 'P2', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 8_000_000 },
       ],
-    })
-    await store.fetchTerrain('COLSANT5')
+```
 
-    expect(store.perProjectFinancials).not.toBeNull()
+Replace (both occurrences):
 
-    const esperadoP1 = calcularFinanzas({
-      capex: store.baseCapex, kWp: store.kWp, kVA: store.kVA,
-      produccionEspecifica: 4.5, arriendoAnual: 12_000_000,
-    })
-    const esperadoP2 = calcularFinanzas({
-      capex: store.baseCapex, kWp: store.kWp, kVA: store.kVA,
-      produccionEspecifica: 4.5, arriendoAnual: 8_000_000,
-    })
-
-    expect(store.perProjectFinancials!['P1'].vpn).toBeCloseTo(esperadoP1.vpn, 6)
-    expect(store.perProjectFinancials!['P2'].vpn).toBeCloseTo(esperadoP2.vpn, 6)
-    // P1 y P2 tienen arriendo distinto (12M vs 8M) y NADA se divide entre ellos — por eso
-    // sus VPN deben diferir. Bajo el modelo anterior (dividir por N) ambos habrían recibido
-    // el mismo arriendo compartido y habrían dado resultados idénticos; este test falla si
-    // alguien reintroduce esa división.
-    expect(store.perProjectFinancials!['P1'].vpn).not.toBe(store.perProjectFinancials!['P2'].vpn)
-  })
-
-  it('general (financialResults) multiplica kWp y kVA por N, no los deja sin escalar', async () => {
-    const store = useEvaluatorStore()
-    vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue({
-      code: 'COLSANT5', name: 'Test', municipality: 'Giron', or: 'ESSA',
-      nivel_tension: '13.8kV', cluster: 2,
-      ocupacion_cauce: false, ocupacion_cauce_detalle: 'No Requiere',
-      servidumbre: 0, servidumbre_detalle: null,
-      coexistencias: false, coexistencias_detalle: [],
-      produccion_especifica: 4.5, arriendo_anual: 20_000_000,
+```ts
       proyectos: [
-        { nombre: 'P1', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 12_000_000 },
-        { nombre: 'P2', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 8_000_000 },
+        { nombre: 'P1', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 12_000_000 },
+        { nombre: 'P2', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 8_000_000 },
       ],
-    })
-    await store.fetchTerrain('COLSANT5')
+```
 
-    const esperado = calcularFinanzas({
-      capex: store.aggregated.capexTotal,
-      kWp: store.kWp * 2,
-      kVA: store.kVA * 2,
-      produccionEspecifica: 4.5,
-      arriendoAnual: 20_000_000,
-    })
+- [ ] **Step 4: Run the type-check and full test suite**
 
-    expect(store.financialResults!.vpn).toBeCloseTo(esperado.vpn, 6)
+Run (from `frontend/`): `npx vue-tsc -b`
+
+Expected: back to exactly 1 pre-existing error — `vite.config.ts(13,3)`.
+
+Run (from `frontend/`): `npx vitest run`
+
+Expected: all test files pass (86 tests, unchanged — this step only satisfies types, no assertions changed yet).
+
+- [ ] **Step 5: Update `CriterionCard.vue` to show the detail when the criterion's own value is `null`**
+
+Find (the `proyectoRows` computed):
+
+```ts
+const proyectoRows = computed(() => {
+  if (!isProyectoScope.value) return []
+  const results = store.perProjectResults
+  return store.proyectoNombres.map(nombre => {
+    const result = results[nombre]?.find(r => r.id === props.result.id)
+    return {
+      nombre,
+      value: result?.value ?? null,
+      sobrecosto: result?.sobrecosto ?? 0,
+    }
   })
 })
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
-
-Run (from `frontend/`): `npx vitest run src/stores/__tests__/evaluatorStore.test.ts`
-
-Expected: FAIL — TypeScript will also flag the missing `arriendo_anual` on the not-yet-updated `ProyectoData` usages in this same file if Step 1 wasn't applied to `types/index.ts` yet (it was, in Step 1 above, so this should be a clean type-check with only assertion failures): the two new `perProjectFinancials` assertions fail because the store still divides everything by `n`, and `financialResults` still uses unscaled `kWp.value`/`kVA.value`.
-
-- [ ] **Step 4: Update `evaluatorStore.ts`'s `context` computed**
-
-Find:
+Replace:
 
 ```ts
-  const context = computed(() => ({ baseCapex: baseCapex.value, kWp: kWp.value, projectCount: projectCount.value }))
-```
+function detalleParaProyecto(nombre: string): string | null {
+  if (props.result.id !== 'aprovechamiento_forestal') return null
+  return store.terrainData?.proyectos.find(p => p.nombre === nombre)?.aprovechamiento_forestal_detalle ?? null
+}
 
-Replace with:
-
-```ts
-  // baseCapex y kWp son magnitudes POR PROYECTO (cada proyecto construye su propia
-  // instalación completa) — el contexto general las multiplica por N en vez de usarlas
-  // tal cual, para que aggregateCosts sume correctamente el capex de los N proyectos.
-  const context = computed(() => ({
-    baseCapex: baseCapex.value * projectCount.value,
-    kWp: kWp.value * projectCount.value,
-    projectCount: projectCount.value,
-  }))
-```
-
-- [ ] **Step 5: Update `financialResults` to scale `kWp`/`kVA` by N**
-
-Find:
-
-```ts
-  const financialResults = computed<FinancialResults | null>(() => {
-    const produccionEspecifica = terrainData.value?.produccion_especifica
-    const arriendoAnual = arriendoManual.value ?? terrainData.value?.arriendo_anual
-    if (!produccionEspecifica || !arriendoAnual) return null
-    return calcularFinanzas({
-      capex: aggregated.value.capexTotal,
-      kWp: kWp.value,
-      kVA: kVA.value,
-      produccionEspecifica,
-      arriendoAnual,
-    })
-  })
-```
-
-Replace with:
-
-```ts
-  const financialResults = computed<FinancialResults | null>(() => {
-    const produccionEspecifica = terrainData.value?.produccion_especifica
-    const arriendoAnual = arriendoManual.value ?? terrainData.value?.arriendo_anual
-    if (!produccionEspecifica || !arriendoAnual) return null
-    return calcularFinanzas({
-      capex: aggregated.value.capexTotal,
-      kWp: kWp.value * projectCount.value,
-      kVA: kVA.value * projectCount.value,
-      produccionEspecifica,
-      arriendoAnual,
-    })
-  })
-```
-
-- [ ] **Step 6: Rewrite `perProjectFinancials` — no more division**
-
-Find:
-
-```ts
-  const perProjectFinancials = computed<Record<string, { vpn: number; vpnConBeneficios: number }> | null>(() => {
-    const produccionEspecifica = terrainData.value?.produccion_especifica
-    const arriendoAnual = arriendoManual.value ?? terrainData.value?.arriendo_anual
-    if (!produccionEspecifica || !arriendoAnual) return null
-    const n = projectCount.value
-    // Divide el CAPEX GENERAL ya agregado (no reconstruir desde perProjectResults —
-    // eso ya divide los criterios terreno_dividido dentro de evaluateScoped; volver
-    // a dividir aquí dividiría dos veces esa porción, y baseCapex quedaría sin dividir).
-    const capexPorProyecto = aggregated.value.capexTotal / n
-
-    const resultado: Record<string, { vpn: number; vpnConBeneficios: number }> = {}
-    for (const nombre of proyectoNombres.value) {
-      const finanzas = calcularFinanzas({
-        capex: capexPorProyecto,
-        kWp: kWp.value / n,
-        kVA: kVA.value / n,
-        produccionEspecifica,
-        arriendoAnual: arriendoAnual / n,
-      })
-      resultado[nombre] = { vpn: finanzas.vpn, vpnConBeneficios: finanzas.vpnConBeneficios }
+const proyectoRows = computed(() => {
+  if (!isProyectoScope.value) return []
+  const results = store.perProjectResults
+  return store.proyectoNombres.map(nombre => {
+    const result = results[nombre]?.find(r => r.id === props.result.id)
+    return {
+      nombre,
+      value: result?.value ?? null,
+      sobrecosto: result?.sobrecosto ?? 0,
+      detalle: detalleParaProyecto(nombre),
     }
-    return resultado
   })
+})
 ```
 
-Replace with:
+Find (in the `<template>`, the proyecto-rows block):
 
-```ts
-  const perProjectFinancials = computed<Record<string, { vpn: number; vpnConBeneficios: number }> | null>(() => {
-    const produccionEspecifica = terrainData.value?.produccion_especifica
-    if (!produccionEspecifica) return null
-
-    const resultado: Record<string, { vpn: number; vpnConBeneficios: number }> = {}
-    for (const proyecto of terrainData.value?.proyectos ?? []) {
-      const arriendoProyecto = proyecto.arriendo_anual
-      if (!arriendoProyecto) continue
-
-      // baseCapex/kWp/kVA son magnitudes POR PROYECTO — cada proyecto usa el valor
-      // completo, sin dividir. Solo se le suma el subtotal de sobrecostos fijos propio
-      // de ESE proyecto (perProjectResults ya trae los criterios terreno_dividido
-      // divididos entre N y los de scope proyecto con el valor propio — ver
-      // evaluateScoped en evaluatorEngine.ts).
-      const results = perProjectResults.value[proyecto.nombre] ?? []
-      const capexProyecto = baseCapex.value + aggregateCosts(results, {
-        baseCapex: baseCapex.value, kWp: kWp.value, projectCount: 1,
-      }).totalSobrecostoFijo
-
-      const finanzas = calcularFinanzas({
-        capex: capexProyecto,
-        kWp: kWp.value,
-        kVA: kVA.value,
-        produccionEspecifica,
-        arriendoAnual: arriendoProyecto,
-      })
-      resultado[proyecto.nombre] = { vpn: finanzas.vpn, vpnConBeneficios: finanzas.vpnConBeneficios }
-    }
-    return Object.keys(resultado).length > 0 ? resultado : null
-  })
+```html
+          <div v-for="row in proyectoRows" :key="row.nombre" class="proyecto-row">
+            <span class="proyecto-row-nombre">{{ row.nombre }}</span>
+            <span class="proyecto-row-valor">{{ row.value ?? '—' }}{{ module?.unit ? ` ${module.unit}` : '' }}</span>
+            <span class="proyecto-row-sobrecosto">{{ formatCOP(row.sobrecosto) }}</span>
+          </div>
 ```
 
-- [ ] **Step 7: Run tests to verify they pass**
+Replace:
 
-Run (from `frontend/`): `npx vitest run src/stores/__tests__/evaluatorStore.test.ts`
-
-Expected: PASS — all tests, including the 2 new/rewritten `perProjectFinancials` tests.
-
-- [ ] **Step 8: Fix `ProjectBreakdownPanel.vue`'s `capexBase` — stop dividing**
-
-Find:
-
-```ts
-    const capexBase = store.baseCapex / n
+```html
+          <div v-for="row in proyectoRows" :key="row.nombre" class="proyecto-row">
+            <span class="proyecto-row-nombre">{{ row.nombre }}</span>
+            <span class="proyecto-row-valor">{{ row.value ?? row.detalle ?? '—' }}{{ module?.unit ? ` ${module.unit}` : '' }}</span>
+            <span class="proyecto-row-sobrecosto">{{ formatCOP(row.sobrecosto) }}</span>
+          </div>
 ```
 
-Replace with:
+(`row.detalle` is `null` for every criterion except `aprovechamiento_forestal` — for those, this is exactly the same as before. `aprovechamiento_forestal` has no `unit` defined in `criteria/aprovechamiento_forestal.ts`, so the unit suffix stays empty either way — this change only affects the value text itself.)
 
-```ts
-    const capexBase = store.baseCapex
-```
+- [ ] **Step 6: Run the type-check and full test suite again**
 
-(`n` is still used elsewhere in this same computed for `aggregateCosts`'s `projectCount: n` — do not remove the `const n = Math.max(store.proyectoNombres.length, 1)` line above it.)
+Run (from `frontend/`): `npx vue-tsc -b`
 
-- [ ] **Step 9: Run the full frontend suite and type-check**
+Expected: exactly 1 pre-existing error — `vite.config.ts(13,3)`.
 
 Run (from `frontend/`): `npx vitest run`
 
 Expected: all test files pass.
 
-Run (from `frontend/`): `npx vue-tsc -b`
+- [ ] **Step 7: Verify against the running dev server**
 
-Expected: exactly 1 error — `vite.config.ts(13,3)` (pre-existing, unrelated).
+This repo has no automated `.vue` component tests. Verify by code trace against real data (done — traced above), and by browser if available:
 
-- [ ] **Step 10: Verify against the running dev server**
+1. Ensure the backend dev server is running (restarted after Task 1) and the frontend dev server is running.
+2. Search `COLBOYT147` (2 projects, both with `aprovechamiento_forestal_detalle: "Exonerado"` per Task 1's smoke test).
+3. Find the "Aprovechamiento forestal" criterion card. Confirm each project row now shows **"Exonerado"** instead of a blank dash, with its cost column still showing `—` (0, unchanged — this only affects visibility, not cost).
+4. If no browser-driving tool is available, state plainly in the report that this step needs human verification — do not guess at the visual outcome.
 
-This repo has no automated `.vue` component tests. Verify by code trace against real data, and by browser if available:
-
-1. Ensure the backend dev server is running (`http://127.0.0.1:5000`, restarted after Task 1's changes) and the frontend dev server is running (`http://localhost:5173`).
-2. `curl -s http://127.0.0.1:5000/api/terrain/COLBOYT147` — confirm `proyectos[]` entries now include `arriendo_anual`.
-3. If you have a live browser available: search `COLBOYT147` (2 projects). Confirm:
-   - "CAPEX Total del terreno" is now roughly double a single project's CAPEX base (not the same as it, and not a fraction of it).
-   - Each project card's "CAPEX base" shows the full `store.baseCapex` value (e.g. 4.000M for the current default), the SAME value in every project's card — not divided by the number of projects.
-4. If no browser-driving tool is available, state plainly in your report that this step needs human verification — do not guess at the visual outcome.
-
-- [ ] **Step 11: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add frontend/src/types/index.ts frontend/src/stores/evaluatorStore.ts frontend/src/stores/__tests__/evaluatorStore.test.ts frontend/src/components/ProjectBreakdownPanel.vue
-git commit -m "fix: baseCapex/kWp/kVA are per-project quantities — scale general by N, stop dividing per-project view"
+git add frontend/src/types/index.ts frontend/src/components/CriterionCard.vue frontend/src/stores/__tests__/evaluatorStore.test.ts
+git commit -m "feat: show resolved aprovechamiento forestal status (e.g. Exonerado) per project"
 ```
 
 ---
+

@@ -1,23 +1,26 @@
 # SDD Progress Ledger
 
-Project: evaluador-advance — desglose-por-proyecto
-Plan: docs/superpowers/plans/2026-07-11-desglose-por-proyecto.md
-Branch: feature/desglose-por-proyecto
-Started: 2026-07-11
-Baseline commit: 5e0aa5f
+Project: evaluador-advance — credito-cluster-y-detalle-forestal
+Plan: docs/superpowers/plans/2026-07-15-credito-cluster-y-detalle-forestal.md
+Branch: master (direct, per Hillary's choice — matches last 2 sessions' pattern)
+Started: 2026-07-15
+Baseline commit: c141dab
 
-Task 1: complete (commit 5e0aa5f..28cb3e3, backend proyectos[] + worst-case fixes; tests 11/12 pass — 1 pre-existing local-env auth failure per Global Constraints; smoke-tested against live dev backend on COLSANT5, confirmed proyectos[] with per-project numero_arboles)
-Task 2: complete (commit 28cb3e3..a2ddd9d, CriterionScope/ProyectoData types + scope on all 18 criteria; review clean, all 18 scope values verified correct, vue-tsc shows only expected deferred errors in CriterionCard.vue/evaluatorStore.test.ts)
-Task 3: complete (commit a2ddd9d..a4effb3, evaluateScoped + aggregateCosts null-filter fix; review clean, all 4 scope behaviors verified against brief; Minor: removed a stray unused @ts-expect-error comment, benign)
+Task 1: complete (commit c141dab..b36f595, backend aprovechamiento_forestal_detalle added to proyectos[]; review clean — spec compliant, correct null-handling verified against aprov_raw upstream, tests assert real values)
 
-Decision (2026-07-14, Hillary): per-project VPN (perProjectFinancials) is ~35% below vpn_general/N because financialEngine.ts has 3 whole-terrain fixed costs (servicios públicos $18M/año, mantenimiento tracker $35-66M cada 5 años, reemplazo inversores $250M año 16) that don't scale with capex/kWp/kVA — dividing inputs by N and calling calcularFinanzas per project double-counts these. Decision: leave as-is, documented as known behavior (not a bug) — each project's VPN reflects paying its own full share of these fixed operational costs. Do NOT add a projectCount/scale param to financialEngine.ts under this plan.
+Task 2: complete (commit b36f595..d90081a, frontend consumes aprovechamiento_forestal_detalle in CriterionCard.vue; type-check + 86/86 tests pass. Live browser verification (Step 7) still needs a human with dev servers running — not done in this session, no browser tool available.)
 
-Task 4: complete (commit a4effb3..43bab8c, perProjectValues/perProjectResults/perProjectFinancials/setPilotesForProyecto in evaluatorStore + SummaryPanel.vue filter fix; review clean; also fixed a stale pre-Task-1/2 mockTerrain fixture and loosened the VPN test tolerance per the human-approved financial-model decision above; Minor: PROYECTO_SCOPE_DB_FIELDS hand-maintained per brief, no test pins the zero-projects guard — both noted, not blockers)
-Task 5: complete (commit 43bab8c..e88f2b1, CriterionCard.vue per-project rows/checkboxes for scope-proyecto criteria; review clean — reviewer independently traced the v-if/v-else-if chain and confirmed a real bug in the brief's literal Step 4 ordering: without the implementer's added `!isProyectoScope` guards on the number/toggle/select branches, the new per-project branches would have been unreachable dead code. Fix verified correct and minimal, other 12 criteria unaffected. No automated .vue tests in this repo — verified via vue-tsc + code trace against live backend; browser visual check still needs a human)
-Task 6: complete (commit e88f2b1..f164d16, ProjectBreakdownPanel.vue + EvaluadorView.vue switched to store.aggregated.breakdown; review clean, all field shapes cross-checked against actual definitions, TIR/Payback shown once not per-project, no stale evaluateCriteria refs left; browser visual check still needs a human)
+Task 3: complete (commit d90081a..e8f119c, cluster credit scope changed terreno_no_dividido -> terreno_dividido so it's repartido between projects instead of excluded; dead terreno_no_dividido scope removed entirely. TDD RED->GREEN verified, type-check + 86/86 tests pass. Live browser verification (Step 8) still needs a human — not done, no browser tool available. Last functional task in the plan; only Task 4 (final verification, no new code) remains.)
 
-All 6 plan tasks complete.
+Task 4: mostly complete (verification only, no files to commit). Backend suite: 12/13 pass, only pre-existing test_terrain_requires_auth fails (expected). Frontend suite: 86/86 pass. Type-check: exactly 1 pre-existing error (vite.config.ts). Live curl smoke test on COLBOYT147: could not connect, no dev server running in this environment (allowed per plan). Step 4 (browser verification of Exonerado + Cluster -$7.500.000 display) still needs a human with both dev servers running — this is the only remaining item to fully close out the plan.
 
-Final whole-branch review (5e0aa5f..f164d16): READY TO MERGE WITH FIXES. No Critical. Important #1 (VITE_SKIP_AUTH not gated to DEV, broke authStore tests locally) — FIXED (commit 37fe8c6: DEV guard + vi.stubEnv in tests, 85/85 frontend tests green). Important #2 (nivel_tension worst-case-then-×N can overcharge a terrain with mixed-tension projects — plan-mandated, not an implementation bug) — human decision (Hillary, 2026-07-14): accept as documented known limitation, no code change. Minor items (per-project VPN identical across projects since capex is a terrain-average not truly per-project; select-type proyecto criteria show raw codes not labels; dbField now vestigial on proyecto-scope criteria) — logged as follow-ups, not blockers.
+PLAN STATUS: all functional work (Tasks 1-3) done and committed (c141dab..e8f119c). Human browser verification (Task 2 Step 7 / Task 3 Step 8 / Task 4 Step 4) was completed live by Hillary later in the same session (COLBOYT147: Exonerado shown per project, Cluster -$7.500.000 per-project line confirmed). PLAN FULLY CLOSED.
 
-Branch: feature/desglose-por-proyecto — READY TO MERGE.
+Post-plan ad-hoc requests (same session, not part of the written plan, all committed and pushed to origin/master):
+- Coexistencias: fallback "No se registran coexistencias" text + dropped redundant Sí/No toggle (3f84d55).
+- Comunidad: switched to amenazas' bueno/medio/malo levels + delay formula (3f84d55).
+- Operador de red (or): now shows real DB operator name as read-only detail + manual meses de retraso input, mirroring servidumbre (3f84d55).
+- Obras hidráulicas: added box culvert 1.0x1.0m ($100M) and alcantarilla 1.5x1.5m ($70M) (7f031d6).
+- Arriendo/Ha: added area_hectareas + precio_hectarea sourced from termsheet_termsheet.rent_area_m2 and minifarm_project.annual_price; fixed a latent arriendo_anual double-count bug for terrains where multiple projects share one termsheet (7740a3a, 71c044d).
+
+All 9 commits pushed to origin/master (c141dab..71c044d). Nothing outstanding.

@@ -1,111 +1,111 @@
-# Task 3 Report: Frontend engine — scope-aware evaluation
+# Task 3 Report — Frontend: cluster credit repartido entre proyectos
 
-## Implementation Summary
+## What was implemented
 
-Successfully implemented `evaluateScoped` function and fixed `aggregateCosts` filter to enable scope-aware evaluation with both general terrain-wide totals and per-project breakdowns in a single pass.
+Previously, the `cluster` criterion's credit (a negative cost of -15M for cluster=2, -30M for cluster>2)
+had `scope: 'terreno_no_dividido'`: it contributed to the general CAPEX total but was explicitly
+skipped (`if (criterion.scope === 'terreno_no_dividido') continue`) when building each project's
+per-project breakdown — so a project's "Fijos" card never showed its share of the cluster credit,
+even though the general total already included it in full.
 
-## What Was Implemented
+Changed `cluster` to `scope: 'terreno_dividido'` (same scope as e.g. `corte`/`lleno`), which means:
+- General total: unchanged — still uses the full `computeCost` result (no `* n` multiplier, since
+  `terreno_dividido` only multiplies for `terreno_multiplicado`).
+- Per-project breakdown: now divides the credit by `projectCount` (`costoBase / n`), same as any
+  other `terreno_dividido` criterion — so cluster=2 with 2 active projects gives -7.5M per project.
 
-### 1. **`evaluateScoped` Function** (evaluatorEngine.ts, lines 54-104)
-- New exported function that computes both general and per-project cost breakdowns simultaneously
-- Signature: `evaluateScoped(values, perProjectValues, proyectoNombres, context): ScopedEvaluation`
-- Implements all 4 scope types correctly:
-  - **scope `proyecto`**: General sums all project costs (with `value: null`); per-project uses individual project values
-  - **scope `terreno_dividido`**: General uses full cost; per-project divides by N (number of projects)
-  - **scope `terreno_multiplicado`**: General multiplies base cost by N; per-project uses base cost (no multiplication)
-  - **scope `terreno_no_dividido`**: General includes; per-project excluded (not listed for individual projects)
+Removed the now-dead `'terreno_no_dividido'` scope entirely: deleted it from the `CriterionScope`
+union type and deleted the `if (criterion.scope === 'terreno_no_dividido') continue` early-exit in
+`evaluateScoped` (dead code — no criterion module used that scope value anymore).
 
-### 2. **ScopedEvaluation Interface** (evaluatorEngine.ts, lines 49-52)
-- Defines return type with `general: CriterionResult[]` and `porProyecto: Record<string, CriterionResult[]>`
+## TDD evidence
 
-### 3. **aggregateCosts Filter Fix** (evaluatorEngine.ts, line 110)
-- Changed filter from `r.formulaDefined && r.value !== null` to `r.formulaDefined`
-- Allows results with `value: null` (like scope-`proyecto` criteria from `evaluateScoped`) to contribute their computed `sobrecosto`
+### RED — tests updated, run before source change
 
-### 4. **Test Suite Enhancements**
-
-Updated `evaluatorEngine.test.ts`:
-- Renamed test: "suma al CAPEX solo los criterios fijos/ambas con formulaDefined=true" (removed "valor distinto de null" requirement)
-- Added 5 new `evaluateScoped` tests:
-  - Scope `proyecto`: Verifies general sums project costs and per-project uses individual values
-  - Scope `terreno_dividido`: Verifies general uses full cost, per-project divides by N
-  - Scope `terreno_multiplicado`: Verifies general multiplies by N, per-project uses base cost
-  - Scope `terreno_no_dividido`: Verifies general included, per-project excluded
-  - Edge case: No active projects (projectCount absent) → uses n=1
-- Added new `aggregateCosts` test: "cuenta un resultado con value=null pero sobrecosto real distinto de cero"
-
-## Test Results
-
-### GREEN — All tests pass:
-```
-Test Files  1 passed (1)
-Tests       17 passed (17)
-```
-
-### Test Evidence
-- `evaluateScoped` tests exercise all 4 scope types with actual computation verification
-- Division/multiplication logic tested with explicit expected values:
-  - `numero_arboles`: 2×142,500 + 3×142,500 per-project sums to general total
-  - `corte` (terreno_dividido): 100×80,000 → divided by 2 per project
-  - `nivel_tension` (terreno_multiplicado): base×2 for general, base per-project
-  - `cluster` (terreno_no_dividido): only in general, excluded from per-project
-- `aggregateCosts` null-value fix verified with synthetic result containing `value: null` and real `sobrecosto`
-
-## Type-Check Results
+Command (from `frontend/`): `npx vitest run src/engine/__tests__/evaluatorEngine.test.ts`
 
 ```
-3 errors (unchanged from Task 2):
-- src/components/CriterionCard.vue(83,29) — Property 'aprovechamiento_forestal_detalle' (Task 5)
-- src/stores/__tests__/evaluatorStore.test.ts(11,3) — 'distancia_via' not in TerrainData (Task 4)
-- vite.config.ts(13,3) — 'test' not in UserConfigExport (pre-existing)
+ ❯ src/engine/__tests__/evaluatorEngine.test.ts (17 tests | 2 failed)
+     × todos tienen un scope válido
+     × cluster (terreno_dividido): general usa el crédito completo; por proyecto lo reparte entre N
+
+AssertionError: expected [ Array(3) ] to include 'terreno_no_dividido'
+AssertionError: expected undefined to be -7500000 // Object.is equality
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 15 passed (17)
 ```
 
-These are deferred to Tasks 4-5 as expected. No new errors introduced by this task.
+Matches the brief's expected failure exactly — `cluster.ts` still had `scope: 'terreno_no_dividido'`.
 
-## Files Changed
+### GREEN — after source change (`cluster.ts`, `types/index.ts`, `evaluatorEngine.ts`)
 
-1. **frontend/src/engine/evaluatorEngine.ts**
-   - Added `ScopedEvaluation` interface (lines 49-52)
-   - Added `evaluateScoped` function (lines 54-104)
-   - Fixed `aggregateCosts` filter (line 110)
+Command (from `frontend/`): `npx vitest run src/engine/__tests__/evaluatorEngine.test.ts`
 
-2. **frontend/src/engine/__tests__/evaluatorEngine.test.ts**
-   - Added import of `evaluateScoped` (line 2)
-   - Updated test name: removed "valor distinto de null" requirement (line 64)
-   - Added new `aggregateCosts` null-value test (lines 72-78)
-   - Added 5 new `evaluateScoped` describe block with all scope tests (lines 105-160)
-   - Removed unused `@ts-expect-error` directive (line 10)
+```
+ Test Files  1 passed (1)
+      Tests  17 passed (17)
+```
 
-## Self-Review Findings
+### `evaluatorStore.test.ts` fix (Step 6)
 
-✓ **Scope handling**: All 4 scopes implemented correctly
-  - `proyecto`: Sums projects in general, individual values per-project
-  - `terreno_dividido`: Full cost general, divided per-project (÷N)
-  - `terreno_multiplicado`: Multiplied general (×N), base per-project
-  - `terreno_no_dividido`: General only, excluded from per-project
+Updated the first `perProjectFinancials` test's expected capex from `store.baseCapex` to
+`store.baseCapex - 7_500_000` for both P1 and P2 — since `cluster` now reaches per-project results
+(cluster=2 → -15M / 2 projects = -7.5M each), reducing each project's capex by that amount. The
+second test in the same describe block needed no change (it compares against
+`store.aggregated.capexTotal` directly, so it already accounts for cluster on both sides).
 
-✓ **Division/multiplication logic**: Thoroughly tested
-  - Division tests use concrete expected values (e.g., 8,000,000 ÷ 2 = 4,000,000)
-  - Multiplication tests verify N×base in general and base in per-project
+## Full frontend suite and type-check (Step 7)
 
-✓ **aggregateCosts filter**: Minimal change (one operator removed)
-  - Only the filter condition changed; no other behavior affected
-  - Now accepts `value: null` when `sobrecosto` is real
+Command (from `frontend/`): `npx vitest run`
 
-✓ **Test coverage**: New tests exercise actual computation, not just function calls
-  - Each test verifies concrete values from `computeCost` results
-  - All 4 scope types covered with explicit assertions
+```
+ Test Files  6 passed (6)
+      Tests  86 passed (86)
+```
 
-✓ **No modifications to `evaluateCriteria`**: Function remains unchanged, as required
+Command (from `frontend/`): `npx vue-tsc -b`
 
-✓ **Backward compatibility**: Existing tests all pass; `evaluateCriteria` still works for existing callers
+```
+vite.config.ts(13,3): error TS2769: No overload matches this call.
+```
 
-## Concerns
+Exactly 1 error, matching the expected pre-existing `vite.config.ts` error — no new type errors.
 
-None. The implementation follows the brief exactly, all tests pass, and type-check shows only expected pre-existing errors from Tasks 4-5.
+## Live/browser verification (Step 8)
+
+Not performed. No dev server was running and no browser-driving tool was available in this
+session. Per the brief's fallback instruction, this is called out here rather than guessed at.
+
+**Needs human verification:** with both dev servers running, search `COLBOYT147` (cluster = 2) and
+confirm in "Desglose por proyecto" that each project card shows a **"Cluster: -$7.500.000"** line
+inside its "Fijos" section, with the "Fijos" subtotal and "CAPEX total" for each card reflecting
+that credit, and that "CAPEX Total del terreno" at the top is unchanged from before this plan.
+
+## Files changed
+
+- `frontend/src/criteria/cluster.ts` — `scope: 'terreno_no_dividido'` → `'terreno_dividido'`.
+- `frontend/src/types/index.ts` — removed `'terreno_no_dividido'` from `CriterionScope`.
+- `frontend/src/engine/evaluatorEngine.ts` — removed the dead `terreno_no_dividido` early-exit in `evaluateScoped`.
+- `frontend/src/engine/__tests__/evaluatorEngine.test.ts` — replaced the `terreno_no_dividido` test with the new repartition test; narrowed the valid-scopes list.
+- `frontend/src/stores/__tests__/evaluatorStore.test.ts` — updated expected per-project capex in `perProjectFinancials`'s first test to account for the cluster credit now reaching per-project results.
 
 ## Commit
 
 ```
-a4effb3 feat: add evaluateScoped for scope-aware general total + per-project breakdown
+e8f119c fix: repartir el crédito de cluster entre proyectos en vez de excluirlo del desglose
+5 files changed, 12 insertions(+), 13 deletions(-)
 ```
+
+## Self-review
+
+- **Completeness**: All code steps (1, 3, 4, 6) from the brief were applied verbatim; verification steps (2, 5, 7) all matched expected output exactly. Step 8 (browser) is explicitly deferred to a human per the brief's allowed fallback.
+- **Quality**: The change reuses the existing `terreno_dividido` code path rather than adding a special case for cluster — the scope reclassification alone produces the correct behavior, and the dead `terreno_no_dividido` branch was fully removed rather than left as unreachable code.
+- **Discipline**: Only the five files named in the brief were staged/committed.
+- **Correctness check**: -15,000,000 / 2 projects = -7,500,000 each — confirmed by both the new `evaluateScoped` unit test and the updated `evaluatorStore` integration test.
+
+## Concerns
+
+None beyond the deferred live verification (Step 8), same caveat as Task 2.
+
+This was the last functional task in the plan (`docs/superpowers/plans/2026-07-15-credito-cluster-y-detalle-forestal.md`). Task 4 ("Final verification") remains — it does not add new code, only end-to-end verification across Tasks 1-3, which needs a human with running dev servers per the same browser-tool gap noted above.

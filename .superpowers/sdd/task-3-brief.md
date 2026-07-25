@@ -1,56 +1,21 @@
-### Task 3: Frontend engine — scope-aware evaluation (general total + per-project breakdown)
+### Task 3: Frontend — cluster credit repartido entre proyectos
 
 **Files:**
+- Modify: `frontend/src/criteria/cluster.ts`
+- Modify: `frontend/src/types/index.ts`
 - Modify: `frontend/src/engine/evaluatorEngine.ts`
 - Modify: `frontend/src/engine/__tests__/evaluatorEngine.test.ts`
+- Modify: `frontend/src/stores/__tests__/evaluatorStore.test.ts`
 
 **Interfaces:**
-- Consumes: `CriterionModule.scope` (Task 2), `EvalContext.projectCount` (Task 2).
-- Produces (used by Task 4): `evaluateScoped(values: CriterionValues, perProjectValues: Record<string, Record<string, CriterionValue>>, proyectoNombres: string[], context: EvalContext) => { general: CriterionResult[]; porProyecto: Record<string, CriterionResult[]> }`.
+- Consumes: nothing from Task 1/2.
+- Produces: nothing consumed by other tasks — this is the last functional task of this plan.
 
-**Why a single combined function, not two separate ones:** the existing `evaluateCriteria` (unchanged, still exported, still used by other tests) computes each criterion's `sobrecosto` from a single shared `values[criterion.id]` — but for scope `proyecto` criteria (distancia_via, distancia_red, aprovechamiento_forestal, numero_arboles, pilotes, tipo_estructura), `criterionValues` no longer holds any value at all (Task 4's `fetchTerrain` skips populating it for these — there's no single shared value, only per-project ones). If the general CAPEX total kept calling plain `evaluateCriteria`, these 6 criteria would silently contribute **$0** to `aggregated.capexTotal` forever. The general total must independently sum each project's own `computeCost` result for `proyecto`-scope criteria, and multiply by N for `terreno_multiplicado` (nivel_tension) — both of which are impossible to express as "one shared value fed through the existing per-criterion formula." `evaluateScoped` computes the general total and the per-project breakdown in the same pass so they can never drift apart from two independent implementations.
+- [ ] **Step 1: Write the failing test for the new repartition behavior**
 
-- [ ] **Step 1: Write the failing tests**
-
-Add to `frontend/src/engine/__tests__/evaluatorEngine.test.ts`, after the existing `describe('aggregateCosts', ...)` block's closing `})`:
+Find (in `frontend/src/engine/__tests__/evaluatorEngine.test.ts`):
 
 ```ts
-
-describe('evaluateScoped', () => {
-  const proyectoNombres = ['P1', 'P2']
-  const scopedCtx = { ...ctx, projectCount: 2 }
-
-  it('scope proyecto: general suma el costo de cada proyecto; por proyecto usa su propio valor', () => {
-    const values = {}
-    const perProjectValues = { numero_arboles: { P1: 2, P2: 3 } }
-    const { general, porProyecto } = evaluateScoped(values, perProjectValues, proyectoNombres, scopedCtx)
-
-    const generalArboles = general.find(r => r.id === 'numero_arboles')
-    expect(generalArboles?.sobrecosto).toBe(2 * 142_500 + 3 * 142_500)
-    expect(generalArboles?.value).toBeNull()
-
-    expect(porProyecto['P1'].find(r => r.id === 'numero_arboles')?.sobrecosto).toBe(2 * 142_500)
-    expect(porProyecto['P2'].find(r => r.id === 'numero_arboles')?.sobrecosto).toBe(3 * 142_500)
-  })
-
-  it('scope terreno_dividido: general usa el costo completo; por proyecto lo divide entre N', () => {
-    const values = { corte: 100 }
-    const { general, porProyecto } = evaluateScoped(values, {}, proyectoNombres, scopedCtx)
-
-    expect(general.find(r => r.id === 'corte')?.sobrecosto).toBe(100 * 80_000)
-    expect(porProyecto['P1'].find(r => r.id === 'corte')?.sobrecosto).toBe((100 * 80_000) / 2)
-    expect(porProyecto['P2'].find(r => r.id === 'corte')?.sobrecosto).toBe((100 * 80_000) / 2)
-  })
-
-  it('scope terreno_multiplicado: general multiplica por N; por proyecto usa el costo completo sin dividir', () => {
-    const values = { nivel_tension: '34.5kV' }
-    const { general, porProyecto } = evaluateScoped(values, {}, proyectoNombres, scopedCtx)
-
-    expect(general.find(r => r.id === 'nivel_tension')?.sobrecosto).toBe(30_000_000 * 2)
-    expect(porProyecto['P1'].find(r => r.id === 'nivel_tension')?.sobrecosto).toBe(30_000_000)
-    expect(porProyecto['P2'].find(r => r.id === 'nivel_tension')?.sobrecosto).toBe(30_000_000)
-  })
-
   it('scope terreno_no_dividido: general sin cambios; no aparece por proyecto', () => {
     const values = { cluster: 2 }
     const { general, porProyecto } = evaluateScoped(values, {}, proyectoNombres, scopedCtx)
@@ -59,115 +24,70 @@ describe('evaluateScoped', () => {
     expect(porProyecto['P1'].find(r => r.id === 'cluster')).toBeUndefined()
     expect(porProyecto['P2'].find(r => r.id === 'cluster')).toBeUndefined()
   })
-
-  it('sin proyectos activos (projectCount ausente): terreno_dividido no divide (usa 1)', () => {
-    const values = { corte: 100 }
-    const { general } = evaluateScoped(values, {}, [], ctx)
-    expect(general.find(r => r.id === 'corte')?.sobrecosto).toBe(100 * 80_000)
-  })
-})
 ```
 
-`aggregateCosts` (existing function, in the same file) has its own bug that would silently defeat the fix above: it filters `results.filter(r => r.formulaDefined && r.value !== null)` before summing anything. Since `evaluateScoped`'s general result deliberately sets `value: null` for scope-`proyecto` criteria (there's no single representative value — only a summed `sobrecosto`), that filter would exclude them from `totalSobrecostoFijo`/`capexTotal` even though `evaluateScoped` computed their sobrecosto correctly. Rename the existing test to stop asserting the soon-to-be-wrong "y valor distinto de null" rule, and add a test proving the new correct behavior.
-
-Find (the existing `aggregateCosts` test's name and body):
+Replace:
 
 ```ts
-describe('aggregateCosts', () => {
-  it('suma al CAPEX solo los criterios fijos/ambas con formulaDefined=true y valor distinto de null', () => {
-    const values = { corte: 100, lleno: 10, pilotes: true }
-    const results = evaluateCriteria(values, ctx)
-    const aggregated = aggregateCosts(results, ctx)
-    const expected = 100 * 80_000 + 10 * 210_000 + 156_000_000
-    expect(aggregated.totalSobrecostoFijo).toBe(expected)
+  it('cluster (terreno_dividido): general usa el crédito completo; por proyecto lo reparte entre N', () => {
+    const values = { cluster: 2 }
+    const { general, porProyecto } = evaluateScoped(values, {}, proyectoNombres, scopedCtx)
+
+    expect(general.find(r => r.id === 'cluster')?.sobrecosto).toBe(-15_000_000)
+    expect(porProyecto['P1'].find(r => r.id === 'cluster')?.sobrecosto).toBe(-7_500_000)
+    expect(porProyecto['P2'].find(r => r.id === 'cluster')?.sobrecosto).toBe(-7_500_000)
   })
 ```
 
-Replace with:
+Also find (the valid-scopes list, same file):
 
 ```ts
-describe('aggregateCosts', () => {
-  it('suma al CAPEX solo los criterios fijos/ambas con formulaDefined=true', () => {
-    const values = { corte: 100, lleno: 10, pilotes: true }
-    const results = evaluateCriteria(values, ctx)
-    const aggregated = aggregateCosts(results, ctx)
-    const expected = 100 * 80_000 + 10 * 210_000 + 156_000_000
-    expect(aggregated.totalSobrecostoFijo).toBe(expected)
-  })
-
-  it('cuenta un resultado con value=null pero sobrecosto real distinto de cero (caso scope proyecto de evaluateScoped)', () => {
-    const results = [
-      {
-        id: 'numero_arboles', label: 'Número de árboles', value: null, sobrecosto: 285_000,
-        formulaDefined: true, fromDb: true, category: 'fijo' as const,
-      },
-    ]
-    const aggregated = aggregateCosts(results, ctx)
-    expect(aggregated.totalSobrecostoFijo).toBe(285_000)
-    expect(aggregated.capexTotal).toBe(ctx.baseCapex + 285_000)
-  })
+    const validScopes = ['proyecto', 'terreno_dividido', 'terreno_multiplicado', 'terreno_no_dividido']
 ```
 
-(Leave every other existing test in this `describe('aggregateCosts', ...)` block untouched — only the one named test above changes.)
+Replace:
+
+```ts
+    const validScopes = ['proyecto', 'terreno_dividido', 'terreno_multiplicado']
+```
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run (from `frontend/`): `npx vitest run src/engine/__tests__/evaluatorEngine.test.ts -t "evaluateScoped|aggregateCosts"`
+Run (from `frontend/`): `npx vitest run src/engine/__tests__/evaluatorEngine.test.ts`
 
-Expected: FAIL — `evaluateScoped` tests fail with `evaluateScoped is not defined` (the function doesn't exist yet), and the new "cuenta un resultado con value=null..." test fails because `aggregateCosts`'s current filter (`r.value !== null`) excludes the synthetic result, giving `totalSobrecostoFijo: 0` instead of the expected `285_000`.
+Expected: FAIL — `cluster.ts` still has `scope: 'terreno_no_dividido'`, so `porProyecto['P1'].find(r => r.id === 'cluster')` is still `undefined`, not `-7_500_000`.
 
-- [ ] **Step 3: Add `evaluateScoped` to `frontend/src/engine/evaluatorEngine.ts`**
+- [ ] **Step 3: Change `cluster.ts`'s scope**
 
-Find (right before `export function aggregateCosts`, i.e. immediately after the closing `}` of the existing `evaluateCriteria` function — do not modify `evaluateCriteria` itself, it stays exactly as-is for its existing callers):
+Find (in `frontend/src/criteria/cluster.ts`):
 
 ```ts
-export function aggregateCosts(
+  scope: 'terreno_no_dividido',
 ```
 
-Insert immediately before this line:
+Replace:
 
 ```ts
-export interface ScopedEvaluation {
-  general: CriterionResult[]
-  porProyecto: Record<string, CriterionResult[]>
-}
+  scope: 'terreno_dividido',
+```
 
-export function evaluateScoped(
-  values: CriterionValues,
-  perProjectValues: Record<string, Record<string, CriterionValue>>,
-  proyectoNombres: string[],
-  context: EvalContext,
-): ScopedEvaluation {
-  const criteria = loadCriteria()
-  const n = context.projectCount ?? 1
+- [ ] **Step 4: Remove the now-dead `'terreno_no_dividido'` scope**
 
-  const general: CriterionResult[] = []
-  const porProyecto: Record<string, CriterionResult[]> = {}
-  for (const nombre of proyectoNombres) porProyecto[nombre] = []
+Find (in `frontend/src/types/index.ts`):
 
-  for (const criterion of criteria) {
-    const base = {
-      id: criterion.id,
-      label: criterion.label,
-      formulaDefined: criterion.formulaDefined,
-      fromDb: criterion.dataSource === 'db',
-      category: criterion.category,
-      riskType: criterion.riskType,
-    }
+```ts
+export type CriterionScope = 'proyecto' | 'terreno_dividido' | 'terreno_multiplicado' | 'terreno_no_dividido'
+```
 
-    if (criterion.scope === 'proyecto') {
-      const valoresPorProyecto = perProjectValues[criterion.id] ?? {}
-      let sumaGeneral = 0
-      for (const nombre of proyectoNombres) {
-        const value = valoresPorProyecto[nombre] ?? null
-        const sobrecosto = criterion.formulaDefined ? criterion.computeCost(value, context) : 0
-        sumaGeneral += sobrecosto
-        porProyecto[nombre].push({ ...base, value, sobrecosto })
-      }
-      general.push({ ...base, value: null, sobrecosto: sumaGeneral })
-      continue
-    }
+Replace:
 
+```ts
+export type CriterionScope = 'proyecto' | 'terreno_dividido' | 'terreno_multiplicado'
+```
+
+Find (in `frontend/src/engine/evaluatorEngine.ts`, inside `evaluateScoped`):
+
+```ts
     const value = values[criterion.id] ?? null
     const costoBase = criterion.formulaDefined ? criterion.computeCost(value, context) : 0
     const costoGeneral = criterion.scope === 'terreno_multiplicado' ? costoBase * n : costoBase
@@ -176,45 +96,83 @@ export function evaluateScoped(
     if (criterion.scope === 'terreno_no_dividido') continue
 
     const costoPorProyecto = criterion.scope === 'terreno_multiplicado' ? costoBase : costoBase / n
-    for (const nombre of proyectoNombres) {
-      porProyecto[nombre].push({ ...base, value, sobrecosto: costoPorProyecto })
-    }
-  }
-
-  return { general, porProyecto }
-}
-
 ```
 
-- [ ] **Step 4: Fix `aggregateCosts`'s null-value filter**
-
-Find:
+Replace:
 
 ```ts
-export function aggregateCosts(
-  results: CriterionResult[],
-  context: EvalContext,
-): AggregatedResult {
-  const active = results.filter(r => r.formulaDefined && r.value !== null)
-```
+    const value = values[criterion.id] ?? null
+    const costoBase = criterion.formulaDefined ? criterion.computeCost(value, context) : 0
+    const costoGeneral = criterion.scope === 'terreno_multiplicado' ? costoBase * n : costoBase
+    general.push({ ...base, value, sobrecosto: costoGeneral })
 
-Replace with:
-
-```ts
-export function aggregateCosts(
-  results: CriterionResult[],
-  context: EvalContext,
-): AggregatedResult {
-  const active = results.filter(r => r.formulaDefined)
+    const costoPorProyecto = criterion.scope === 'terreno_multiplicado' ? costoBase : costoBase / n
 ```
 
 - [ ] **Step 5: Run tests to verify they pass**
 
 Run (from `frontend/`): `npx vitest run src/engine/__tests__/evaluatorEngine.test.ts`
 
-Expected: PASS — all tests in the file pass, including the 5 new `evaluateScoped` tests and the new `aggregateCosts` null-value test.
+Expected: PASS — all tests in this file.
 
-- [ ] **Step 6: Run the full suite and type-check**
+- [ ] **Step 6: Fix `evaluatorStore.test.ts`'s `perProjectFinancials` test — cluster credit now reaches per-project capex**
+
+This test's mock has `cluster: 2`, which `fetchTerrain` auto-populates into `criterionValues.cluster` (see `evaluatorStore.ts`'s `dbValues` loop). After Step 3, `cluster` is scope `'terreno_dividido'`, so it now appears in `perProjectResults` for both `P1` and `P2` at `-15_000_000 / 2 = -7_500_000` each — reducing each project's capex by that amount.
+
+Find (in `frontend/src/stores/__tests__/evaluatorStore.test.ts`, inside the first test of `describe('perProjectFinancials', ...)`):
+
+```ts
+      // Sin datos de scope 'proyecto' (todo null) para que el subtotal de sobrecostos
+      // fijos de cada proyecto sea 0 y el capex de cada uno sea exactamente store.baseCapex
+      // — así el test puede verificar el valor exacto sin recalcular fórmulas de criterios.
+      proyectos: [
+        { nombre: 'P1', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 12_000_000 },
+        { nombre: 'P2', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 8_000_000 },
+      ],
+    })
+    await store.fetchTerrain('COLSANT5')
+
+    expect(store.perProjectFinancials).not.toBeNull()
+
+    const esperadoP1 = calcularFinanzas({
+      capex: store.baseCapex, kWp: store.kWp, kVA: store.kVA,
+      produccionEspecifica: 4.5, arriendoAnual: 12_000_000,
+    })
+    const esperadoP2 = calcularFinanzas({
+      capex: store.baseCapex, kWp: store.kWp, kVA: store.kVA,
+      produccionEspecifica: 4.5, arriendoAnual: 8_000_000,
+    })
+```
+
+Replace:
+
+```ts
+      // Sin datos de scope 'proyecto' (todo null). El único costo fijo que sí aplica es el
+      // crédito de cluster (scope 'terreno_dividido', cluster=2 → -15M repartido entre los
+      // 2 proyectos = -7.5M cada uno) — el capex de cada proyecto es store.baseCapex menos
+      // ese crédito, no exactamente store.baseCapex.
+      proyectos: [
+        { nombre: 'P1', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 12_000_000 },
+        { nombre: 'P2', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 8_000_000 },
+      ],
+    })
+    await store.fetchTerrain('COLSANT5')
+
+    expect(store.perProjectFinancials).not.toBeNull()
+
+    const esperadoP1 = calcularFinanzas({
+      capex: store.baseCapex - 7_500_000, kWp: store.kWp, kVA: store.kVA,
+      produccionEspecifica: 4.5, arriendoAnual: 12_000_000,
+    })
+    const esperadoP2 = calcularFinanzas({
+      capex: store.baseCapex - 7_500_000, kWp: store.kWp, kVA: store.kVA,
+      produccionEspecifica: 4.5, arriendoAnual: 8_000_000,
+    })
+```
+
+(The second test in this describe block, `'general (financialResults) multiplica kWp y kVA por N...'`, compares against `store.aggregated.capexTotal` directly rather than a hardcoded expectation — it already accounts for whatever `cluster` contributes on both sides of the comparison, so it needs no change.)
+
+- [ ] **Step 7: Run the full frontend suite and type-check**
 
 Run (from `frontend/`): `npx vitest run`
 
@@ -222,14 +180,20 @@ Expected: all test files pass.
 
 Run (from `frontend/`): `npx vue-tsc -b`
 
-Expected: same 2 pre-existing errors as before, plus whatever `TerrainData`-field errors were already present from Task 2 (still expected to be resolved by Task 4 and Task 5 — do not fix them in this task).
+Expected: exactly 1 error — `vite.config.ts(13,3)` (pre-existing, unrelated).
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Verify against the running dev server**
+
+1. Ensure both dev servers are running, search `COLBOYT147` (cluster = 2).
+2. In "Desglose por proyecto", confirm each project card now shows a **"Cluster: -$7.500.000"** line inside its "Fijos" section, and that the "Fijos" subtotal and "CAPEX total" for each card reflect that credit.
+3. Confirm "CAPEX Total del terreno" at the top of the panel is unchanged from before this plan (the general total already included the full -15M once).
+4. If no browser-driving tool is available, state plainly in the report that this step needs human verification.
+
+- [ ] **Step 9: Commit**
 
 ```bash
-git add frontend/src/engine/evaluatorEngine.ts frontend/src/engine/__tests__/evaluatorEngine.test.ts
-git commit -m "feat: add evaluateScoped for scope-aware general total + per-project breakdown"
+git add frontend/src/criteria/cluster.ts frontend/src/types/index.ts frontend/src/engine/evaluatorEngine.ts frontend/src/engine/__tests__/evaluatorEngine.test.ts frontend/src/stores/__tests__/evaluatorStore.test.ts
+git commit -m "fix: repartir el crédito de cluster entre proyectos en vez de excluirlo del desglose"
 ```
 
 ---
-
