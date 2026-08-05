@@ -257,9 +257,10 @@ describe('perProjectFinancials', () => {
 
     // El crédito de cluster (terreno_dividido, cluster=2 → -15M) se sigue repartiendo por
     // igual entre los 2 proyectos (-7.5M c/u), independiente del capex base de cada uno.
+    // P1 es tracker → produccionEspecifica lleva el factor 1.1 (P2 es mesa_fija, sin ajuste).
     const esperadoP1 = calcularFinanzas({
       capex: store.baseCapex - 7_500_000, kWp: store.kWp, kVA: store.kVA,
-      produccionEspecifica: 4.5, arriendoAnual: 12_000_000,
+      produccionEspecifica: 4.5 * 1.1, arriendoAnual: 12_000_000,
     })
     const esperadoP2 = calcularFinanzas({
       capex: 3_750_000_000 - 7_500_000, kWp: store.kWp, kVA: store.kVA,
@@ -272,6 +273,43 @@ describe('perProjectFinancials', () => {
     // El total general suma el capex base de CADA proyecto (4.000M + 3.750M), no
     // baseCapex * N (que asumiría que todos los proyectos usan el mismo capex base).
     expect(store.aggregated.capexTotal).toBe(store.baseCapex + 3_750_000_000 - 15_000_000)
+  })
+
+  it('tracker multiplica la producción específica x1.1 — Google Sheet de referencia: 4.117 × 1.1 = 4.529', async () => {
+    const store = useEvaluatorStore()
+    vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue({
+      code: 'COLBOYT147', name: 'Test', municipality: 'Tunja', or: 'EBSA',
+      nivel_tension: '13.8kV', cluster: 2,
+      ocupacion_cauce: false, ocupacion_cauce_detalle: 'No Requiere',
+      servidumbre: 0, servidumbre_detalle: null,
+      coexistencias: false, coexistencias_detalle: [],
+      produccion_especifica: 4.117, arriendo_anual: 20_000_000, area_hectareas: null, precio_hectarea: null,
+      proyectos: [
+        { nombre: 'P1', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: 'tracker', arriendo_anual: 12_000_000, precio_hectarea: null },
+        { nombre: 'P2', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: 'mesa_fija', arriendo_anual: 8_000_000, precio_hectarea: null },
+      ],
+    })
+    await store.fetchTerrain('COLBOYT147')
+
+    const esperadoP1 = calcularFinanzas({
+      capex: store.baseCapex - 7_500_000, kWp: store.kWp, kVA: store.kVA,
+      produccionEspecifica: 4.117 * 1.1, arriendoAnual: 12_000_000,
+    })
+    const esperadoP2 = calcularFinanzas({
+      capex: 3_750_000_000 - 7_500_000, kWp: store.kWp, kVA: store.kVA,
+      produccionEspecifica: 4.117, arriendoAnual: 8_000_000,
+    })
+
+    expect(store.perProjectFinancials!['P1'].vpn).toBeCloseTo(esperadoP1.vpn, 6)
+    expect(store.perProjectFinancials!['P2'].vpn).toBeCloseTo(esperadoP2.vpn, 6)
+    // El ajuste solo aplica al tracker — mismos VPN si P1 no recibiera el factor 1.1.
+    expect(store.perProjectFinancials!['P1'].vpn).not.toBeCloseTo(
+      calcularFinanzas({
+        capex: store.baseCapex - 7_500_000, kWp: store.kWp, kVA: store.kVA,
+        produccionEspecifica: 4.117, arriendoAnual: 12_000_000,
+      }).vpn,
+      6,
+    )
   })
 
   it('general (financialResults) multiplica kWp y kVA por N, no los deja sin escalar', async () => {

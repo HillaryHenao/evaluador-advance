@@ -13,6 +13,11 @@ const BASE_CAPEX_DEFAULT = 4_000_000_000
 const MESA_FIJA_CAPEX = 3_750_000_000
 const KWP_DEFAULT = 1320.8
 const KVA_DEFAULT = 990
+// Estructura tracker capta ~10% más que el sitio "crudo" (Google Sheet de referencia:
+// Producción específica día = 4.529 = 4.117 (radiación de plataforma) × 1.1 — ese 4.529
+// es precisamente el caso de referencia usado en el golden master, un proyecto tracker).
+// Mesa fija no lleva ajuste.
+const FACTOR_PRODUCCION_TRACKER = 1.1
 const PROYECTO_SCOPE_DB_FIELDS = ['distancia_via', 'distancia_red', 'aprovechamiento_forestal', 'numero_arboles', 'tipo_estructura']
 
 export const useEvaluatorStore = defineStore('evaluador', () => {
@@ -34,6 +39,12 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
   // cada proyecto resuelve el suyo propio según su tipo_estructura (scope 'proyecto').
   function capexBaseParaProyecto(nombre: string): number {
     return perProjectValues.value.tipo_estructura?.[nombre] === 'mesa_fija' ? MESA_FIJA_CAPEX : baseCapex.value
+  }
+
+  // Tracker capta ~10% más energía que la producción específica cruda del sitio — mesa
+  // fija (o tipo aún sin resolver) no lleva ajuste. Ver FACTOR_PRODUCCION_TRACKER.
+  function produccionEspecificaParaProyecto(nombre: string, base: number): number {
+    return perProjectValues.value.tipo_estructura?.[nombre] === 'tracker' ? base * FACTOR_PRODUCCION_TRACKER : base
   }
 
   // baseCapex y kWp son magnitudes POR PROYECTO (cada proyecto construye su propia
@@ -101,7 +112,7 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
         capex: capexProyecto,
         kWp: kWp.value,
         kVA: kVA.value,
-        produccionEspecifica,
+        produccionEspecifica: produccionEspecificaParaProyecto(proyecto.nombre, produccionEspecifica),
         arriendoAnual: arriendoProyecto,
       })
     }
