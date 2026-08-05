@@ -9,6 +9,7 @@ export interface ProyectoData {
   numero_arboles: number | null
   tipo_estructura: string | null
   arriendo_anual: number | null
+  precio_hectarea: number | null
 }
 
 export interface ObraHidraulicaItem {

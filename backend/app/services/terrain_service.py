@@ -306,6 +306,7 @@ def _get_proyectos_activos(terrain_id: int) -> list[dict]:
                        p.name                                      AS nombre,
                        p.road_distance                             AS distancia_via,
                        p.network_distance                          AS distancia_red,
+                       p.annual_price                              AS precio_hectarea,
                        (
                            SELECT vf.value FROM validation_field vf
                            WHERE (vf.project_id = p.id OR vf.terrain_id = p.terrain_id)
@@ -381,6 +382,7 @@ def _get_proyectos_activos(terrain_id: int) -> list[dict]:
             'aprovechamiento_forestal': _resolve_aprovechamiento_nivel(aprov_raw),
             'aprovechamiento_forestal_detalle': aprov_raw or None,
             'arriendo_anual': r['arriendo_anual'],
+            'precio_hectarea': float(r['precio_hectarea']) if r['precio_hectarea'] is not None else None,
         })
     return proyectos
 

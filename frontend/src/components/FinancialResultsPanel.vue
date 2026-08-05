@@ -24,8 +24,11 @@ function formatAnios(value: number): string {
 
 const faltaProduccion = computed(() => store.produccionEspecificaManual == null && store.terrainData?.produccion_especifica == null)
 const faltaArriendo = computed(() => store.arriendoManual == null && store.terrainData?.arriendo_anual == null)
-const arriendoEfectivo = computed(() => store.arriendoManual ?? store.terrainData?.arriendo_anual ?? null)
 const produccionEfectiva = computed(() => store.produccionEspecificaManual ?? store.terrainData?.produccion_especifica ?? null)
+
+function precioHectareaProyecto(nombre: string): number | null {
+  return store.terrainData?.proyectos.find(p => p.nombre === nombre)?.precio_hectarea ?? null
+}
 </script>
 
 <template>
@@ -34,12 +37,17 @@ const produccionEfectiva = computed(() => store.produccionEspecificaManual ?? st
 
     <div v-if="!store.perProjectFinancials" class="financial-empty">
       <p v-if="faltaProduccion">Falta producción específica del terreno — completa manualmente abajo.</p>
-      <p v-if="faltaArriendo">Falta arriendo anual — completa manualmente abajo.</p>
+      <p v-if="faltaArriendo">Falta arriendo anual de plataforma para este terreno.</p>
     </div>
 
     <template v-else>
       <div v-for="nombre in store.proyectoNombres" :key="nombre" class="financial-project">
         <div class="financial-project-title">{{ nombre }}</div>
+
+        <div class="financial-row" v-if="precioHectareaProyecto(nombre)">
+          <span class="financial-label">Precio / Ha</span>
+          <span class="financial-value">{{ formatCOP(precioHectareaProyecto(nombre)!) }}</span>
+        </div>
 
         <template v-if="store.perProjectFinancials[nombre]">
           <div class="financial-row">
@@ -83,22 +91,6 @@ const produccionEfectiva = computed(() => store.produccionEspecificaManual ?? st
           @change="(e) => (store.produccionEspecificaManual = Number((e.target as HTMLInputElement).value) || null)"
         />
       </label>
-
-      <label class="financial-input-label">
-        Arriendo anual (COP) — {{ store.terrainData?.arriendo_anual ? 'de plataforma, editable' : 'no viene de plataforma' }}
-        <input
-          type="number"
-          :value="arriendoEfectivo ?? ''"
-          placeholder="Arriendo anual (COP)"
-          class="financial-input"
-          @change="(e) => (store.arriendoManual = Number((e.target as HTMLInputElement).value) || null)"
-        />
-      </label>
-
-      <div class="financial-row" v-if="store.terrainData?.precio_hectarea">
-        <span class="financial-label">Precio / Ha</span>
-        <span class="financial-value">{{ formatCOP(store.terrainData.precio_hectarea) }}</span>
-      </div>
 
       <div class="financial-row" v-if="store.terrainData?.area_hectareas">
         <span class="financial-label">Ha negociadas</span>
