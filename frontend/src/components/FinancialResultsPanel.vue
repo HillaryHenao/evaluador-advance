@@ -98,12 +98,23 @@ function precioHectareaProyecto(nombre: string): number | null {
       </div>
 
       <label class="financial-input-label">
+        Potencia DC (kWp)
+        <input
+          type="number"
+          step="0.1"
+          :value="store.kWp"
+          class="financial-input"
+          @change="(e) => (store.kWp = Number((e.target as HTMLInputElement).value) || 1320.8)"
+        />
+      </label>
+
+      <label class="financial-input-label">
         Potencia AC (kVA)
         <input
           type="number"
           :value="store.kVA"
           class="financial-input"
-          @change="(e) => (store.kVA = Number((e.target as HTMLInputElement).value) || 1000)"
+          @change="(e) => (store.kVA = Number((e.target as HTMLInputElement).value) || 990)"
         />
       </label>
     </div>

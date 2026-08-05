@@ -11,7 +11,8 @@ type PerProjectValues = Record<string, Record<string, CriterionValue>>
 
 const BASE_CAPEX_DEFAULT = 4_000_000_000
 const MESA_FIJA_CAPEX = 3_750_000_000
-const KWP_DEFAULT = 1320
+const KWP_DEFAULT = 1320.8
+const KVA_DEFAULT = 990
 const PROYECTO_SCOPE_DB_FIELDS = ['distancia_via', 'distancia_red', 'aprovechamiento_forestal', 'numero_arboles', 'tipo_estructura']
 
 export const useEvaluatorStore = defineStore('evaluador', () => {
@@ -20,7 +21,7 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
   const perProjectValues = ref<PerProjectValues>({})
   const baseCapex = ref(BASE_CAPEX_DEFAULT)
   const kWp = ref(KWP_DEFAULT)
-  const kVA = ref(1000)
+  const kVA = ref(KVA_DEFAULT)
   const arriendoManual = ref<number | null>(null)
   const produccionEspecificaManual = ref<number | null>(null)
   const loading = ref(false)
