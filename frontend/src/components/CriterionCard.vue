@@ -227,8 +227,10 @@ function handleToggle(event: Event) {
         <div class="proyecto-rows">
           <div v-for="row in proyectoRows" :key="row.nombre" class="proyecto-row">
             <span class="proyecto-row-nombre">{{ row.nombre }}</span>
-            <span class="proyecto-row-valor">{{ row.value ?? row.detalle ?? '—' }}{{ module?.unit ? ` ${module.unit}` : '' }}</span>
-            <span class="proyecto-row-sobrecosto">{{ formatCOP(row.sobrecosto) }}</span>
+            <div class="proyecto-row-detail">
+              <span class="proyecto-row-valor">{{ row.value ?? row.detalle ?? '—' }}{{ module?.unit ? ` ${module.unit}` : '' }}</span>
+              <span class="proyecto-row-sobrecosto">{{ formatCOP(row.sobrecosto) }}</span>
+            </div>
           </div>
           <div class="proyecto-row proyecto-row--total">
             <span class="proyecto-row-nombre">Total</span>
@@ -523,18 +525,27 @@ function handleToggle(event: Event) {
   background: rgba(22, 163, 74, 0.08);
 }
 
-.proyecto-rows { display: flex; flex-direction: column; gap: 0.4rem; width: 100%; }
+.proyecto-rows { display: flex; flex-direction: column; gap: 0.5rem; width: 100%; }
 .proyecto-row {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.15rem;
   font-size: 0.78rem;
 }
-.proyecto-row-nombre { color: var(--text-mid); flex: 1; }
+.proyecto-row-nombre { color: var(--text-mid); word-break: break-word; }
+.proyecto-row-detail {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+}
 .proyecto-row-valor { color: var(--text); font-weight: 600; white-space: nowrap; }
-.proyecto-row-sobrecosto { color: var(--purple); font-weight: 700; white-space: nowrap; }
+.proyecto-row-sobrecosto { color: var(--purple); font-weight: 700; white-space: nowrap; margin-left: auto; }
 .proyecto-row--total {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
   border-top: 1px dashed var(--border);
   padding-top: 0.4rem;
   margin-top: 0.2rem;
