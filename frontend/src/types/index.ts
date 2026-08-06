@@ -10,6 +10,7 @@ export interface ProyectoData {
   tipo_estructura: string | null
   arriendo_anual: number | null
   precio_hectarea: number | null
+  area_hectareas: number | null
 }
 
 export interface ObraHidraulicaItem {

@@ -336,7 +336,11 @@ def _get_proyectos_activos(terrain_id: int) -> list[dict]:
                        (
                            SELECT ts.rent_annual_cost_cop FROM termsheet_termsheet ts
                            WHERE ts.id = p.termsheet_id
-                       )                                           AS arriendo_anual
+                       )                                           AS arriendo_anual,
+                       (
+                           SELECT ts.rent_area_m2 FROM termsheet_termsheet ts
+                           WHERE ts.id = p.termsheet_id
+                       )                                           AS rent_area_m2
                    FROM minifarm_project p
                    WHERE p.terrain_id = %s
                      AND p.stage NOT IN ('dead', 'paused', 'uci')
@@ -383,6 +387,7 @@ def _get_proyectos_activos(terrain_id: int) -> list[dict]:
             'aprovechamiento_forestal_detalle': aprov_raw or None,
             'arriendo_anual': r['arriendo_anual'],
             'precio_hectarea': float(r['precio_hectarea']) if r['precio_hectarea'] is not None else None,
+            'area_hectareas': _m2_a_hectareas(r['rent_area_m2']),
         })
     return proyectos
 

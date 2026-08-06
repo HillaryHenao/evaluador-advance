@@ -29,6 +29,19 @@ const produccionEfectiva = computed(() => store.produccionEspecificaManual ?? st
 function precioHectareaProyecto(nombre: string): number | null {
   return store.terrainData?.proyectos.find(p => p.nombre === nombre)?.precio_hectarea ?? null
 }
+
+function areaProyecto(nombre: string): number | null {
+  return store.terrainData?.proyectos.find(p => p.nombre === nombre)?.area_hectareas ?? null
+}
+
+// Solo informativo — no alimenta TIR/VPN/Payback (esos usan el arriendo_anual del
+// termsheet). Sirve para comparar contra ese dato: Precio/Ha × Ha arrendadas del proyecto.
+function arriendoCalculadoProyecto(nombre: string): number | null {
+  const precio = precioHectareaProyecto(nombre)
+  const area = areaProyecto(nombre)
+  if (precio == null || area == null) return null
+  return precio * area
+}
 </script>
 
 <template>
@@ -47,6 +60,16 @@ function precioHectareaProyecto(nombre: string): number | null {
         <div class="financial-row" v-if="precioHectareaProyecto(nombre)">
           <span class="financial-label">Precio / Ha</span>
           <span class="financial-value">{{ formatCOP(precioHectareaProyecto(nombre)!) }}</span>
+        </div>
+
+        <div class="financial-row" v-if="areaProyecto(nombre)">
+          <span class="financial-label">Área del proyecto</span>
+          <span class="financial-value">{{ areaProyecto(nombre) }} Ha</span>
+        </div>
+
+        <div class="financial-row" v-if="arriendoCalculadoProyecto(nombre)">
+          <span class="financial-label">Arriendo total del proyecto x año</span>
+          <span class="financial-value">{{ formatCOP(arriendoCalculadoProyecto(nombre)!) }}</span>
         </div>
 
         <template v-if="store.perProjectFinancials[nombre]">
