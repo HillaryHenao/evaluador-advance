@@ -26,22 +26,24 @@ const faltaProduccion = computed(() => store.produccionEspecificaManual == null 
 const faltaArriendo = computed(() => store.arriendoManual == null && store.terrainData?.arriendo_anual == null)
 const produccionEfectiva = computed(() => store.produccionEspecificaManual ?? store.terrainData?.produccion_especifica ?? null)
 
+function proyectoPorNombre(nombre: string) {
+  return store.terrainData?.proyectos.find(p => p.nombre === nombre) ?? null
+}
+
 function precioHectareaProyecto(nombre: string): number | null {
-  return store.terrainData?.proyectos.find(p => p.nombre === nombre)?.precio_hectarea ?? null
+  return proyectoPorNombre(nombre)?.precio_hectarea ?? null
 }
 
 function areaProyecto(nombre: string): number | null {
-  return store.terrainData?.proyectos.find(p => p.nombre === nombre)?.area_hectareas ?? null
+  return proyectoPorNombre(nombre)?.area_hectareas ?? null
 }
 
-// Precio/Ha × Ha arrendadas del proyecto — este es el valor que TIR/VPN/Payback usan como
-// arriendo cuando ambos datos existen (más confiable que arriendo_anual del termsheet, ver
-// evaluatorStore.arriendoParaProyecto).
-function arriendoCalculadoProyecto(nombre: string): number | null {
-  const precio = precioHectareaProyecto(nombre)
-  const area = areaProyecto(nombre)
-  if (precio == null || area == null) return null
-  return precio * area
+// El valor real que alimenta TIR/VPN/Payback de este proyecto — Precio/Ha × Área cuando
+// ambos existen (más confiable que arriendo_anual del termsheet), si no arriendo_anual/manual.
+// Ver evaluatorStore.arriendoParaProyecto — misma función, para que nunca se desalineen.
+function arriendoUsadoProyecto(nombre: string): number | null {
+  const proyecto = proyectoPorNombre(nombre)
+  return proyecto ? store.arriendoParaProyecto(proyecto) : null
 }
 </script>
 
@@ -68,9 +70,9 @@ function arriendoCalculadoProyecto(nombre: string): number | null {
           <span class="financial-value">{{ areaProyecto(nombre) }} Ha</span>
         </div>
 
-        <div class="financial-row" v-if="arriendoCalculadoProyecto(nombre)">
-          <span class="financial-label">Arriendo total del proyecto x año</span>
-          <span class="financial-value">{{ formatCOP(arriendoCalculadoProyecto(nombre)!) }}</span>
+        <div class="financial-row" v-if="arriendoUsadoProyecto(nombre) != null">
+          <span class="financial-label">Arriendo usado en el modelo</span>
+          <span class="financial-value financial-value--highlight">{{ formatCOP(arriendoUsadoProyecto(nombre)!) }}</span>
         </div>
 
         <template v-if="store.perProjectFinancials[nombre]">

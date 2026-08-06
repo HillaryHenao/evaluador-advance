@@ -187,6 +187,6 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
     terrainData, criterionValues, perProjectValues, baseCapex, kWp, kVA, arriendoManual, produccionEspecificaManual,
     loading, error, aggregated, financialResults, perProjectResults, perProjectFinancials,
     proyectoNombres, fetchTerrain, setCriterionValue, setPilotesForProyecto, reset,
-    capexBaseParaProyecto,
+    capexBaseParaProyecto, arriendoParaProyecto,
   }
 })
