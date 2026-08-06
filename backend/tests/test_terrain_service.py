@@ -55,6 +55,7 @@ def test_get_proyectos_activos_devuelve_datos_por_proyecto():
             'tipo_raw': '1P TRACKER', 'numero_arboles_raw': '2',
             'aprov_value': 'Visita', 'aprov_status': 'pending',
             'arriendo_anual': 12_000_000.0,
+            'precio_hectarea': 5_000_000.0, 'rent_area_m2': 25_000.0,
         },
         {
             'nombre': 'COLSANT5P2_GIRON_SUR',
@@ -62,6 +63,7 @@ def test_get_proyectos_activos_devuelve_datos_por_proyecto():
             'tipo_raw': 'MESA FIJA', 'numero_arboles_raw': '0',
             'aprov_value': None, 'aprov_status': 'exonerated',
             'arriendo_anual': 8_000_000.0,
+            'precio_hectarea': 4_000_000.0, 'rent_area_m2': 20_000.0,
         },
     ]
     with patch.object(terrain_service, '_connect', return_value=_mock_conn(rows)):
@@ -73,12 +75,14 @@ def test_get_proyectos_activos_devuelve_datos_por_proyecto():
             'tipo_estructura': 'tracker', 'numero_arboles': 2, 'aprovechamiento_forestal': 'visita',
             'aprovechamiento_forestal_detalle': 'Visita',
             'arriendo_anual': 12_000_000.0,
+            'precio_hectarea': 5_000_000.0, 'area_hectareas': 2.5,
         },
         {
             'nombre': 'COLSANT5P2_GIRON_SUR', 'distancia_via': 12.0, 'distancia_red': 28.0,
             'tipo_estructura': 'mesa_fija', 'numero_arboles': 0, 'aprovechamiento_forestal': None,
             'aprovechamiento_forestal_detalle': 'Exonerado',
             'arriendo_anual': 8_000_000.0,
+            'precio_hectarea': 4_000_000.0, 'area_hectareas': 2.0,
         },
     ]
 
@@ -96,6 +100,7 @@ def test_get_proyectos_activos_arboles_cero_cuando_forestal_resuelto_sin_dato():
             'tipo_raw': '1P TRACKER', 'numero_arboles_raw': None,
             'aprov_value': 'Exonerado', 'aprov_status': 'pending',
             'arriendo_anual': 5_000_000.0,
+            'precio_hectarea': 10_510_000.0, 'rent_area_m2': 25_000.0,
         },
         {
             'nombre': 'COLBOYT147P2_TUNJA_OCCIDENTE',
@@ -103,6 +108,7 @@ def test_get_proyectos_activos_arboles_cero_cuando_forestal_resuelto_sin_dato():
             'tipo_raw': '1P TRACKER', 'numero_arboles_raw': None,
             'aprov_value': 'Visita', 'aprov_status': 'pending',
             'arriendo_anual': 3_000_000.0,
+            'precio_hectarea': 6_000_000.0, 'rent_area_m2': 0.0,
         },
     ]
     with patch.object(terrain_service, '_connect', return_value=_mock_conn(rows)):

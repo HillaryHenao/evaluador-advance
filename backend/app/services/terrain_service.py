@@ -307,6 +307,7 @@ def _get_proyectos_activos(terrain_id: int) -> list[dict]:
                        p.road_distance                             AS distancia_via,
                        p.network_distance                          AS distancia_red,
                        p.annual_price                              AS precio_hectarea,
+                       p.area_m2                                   AS rent_area_m2,
                        (
                            SELECT vf.value FROM validation_field vf
                            WHERE (vf.project_id = p.id OR vf.terrain_id = p.terrain_id)
@@ -336,11 +337,7 @@ def _get_proyectos_activos(terrain_id: int) -> list[dict]:
                        (
                            SELECT ts.rent_annual_cost_cop FROM termsheet_termsheet ts
                            WHERE ts.id = p.termsheet_id
-                       )                                           AS arriendo_anual,
-                       (
-                           SELECT ts.rent_area_m2 FROM termsheet_termsheet ts
-                           WHERE ts.id = p.termsheet_id
-                       )                                           AS rent_area_m2
+                       )                                           AS arriendo_anual
                    FROM minifarm_project p
                    WHERE p.terrain_id = %s
                      AND p.stage NOT IN ('dead', 'paused', 'uci')
@@ -431,15 +428,15 @@ def get_terrain_data(code: str) -> Optional[dict]:
                         ) ts_arriendo
                     )                                           AS arriendo_anual,
                     (
-                        -- Ha negociadas: área del termsheet (no el área física completa del
-                        -- predio en termsheet_terrain), misma deduplicación por termsheet.
-                        SELECT SUM(rent_area_m2) FROM (
-                            SELECT DISTINCT ts.id, ts.rent_area_m2
-                            FROM minifarm_project mp4
-                            JOIN termsheet_termsheet ts ON ts.id = mp4.termsheet_id
-                            WHERE mp4.terrain_id = t.id
-                              AND mp4.stage NOT IN ('dead', 'paused', 'uci')
-                        ) ts_area
+                        -- Ha negociadas: suma de minifarm_project.area_m2 por proyecto — NO
+                        -- termsheet_termsheet.rent_area_m2 (ese campo puede quedar en 0/sin
+                        -- diligenciar aun cuando el área ya está cargada por proyecto en
+                        -- origination; area_m2 es lo que ve el usuario como "Área negociada",
+                        -- ver caso real COLBOYT147P1 = 25.000 m² con termsheet.rent_area_m2 = 0).
+                        SELECT SUM(mp4.area_m2)
+                        FROM minifarm_project mp4
+                        WHERE mp4.terrain_id = t.id
+                          AND mp4.stage NOT IN ('dead', 'paused', 'uci')
                     )                                           AS rent_area_m2,
                     (
                         -- precio_hectarea: minifarm_project.annual_price ya viene en COP/Ha,

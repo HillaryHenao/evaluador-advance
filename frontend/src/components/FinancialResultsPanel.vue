@@ -169,8 +169,10 @@ function arriendoCalculadoProyecto(nombre: string): number | null {
 
 .financial-row {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: baseline;
+  gap: 0.25rem 0.5rem;
   font-size: 0.9rem;
 }
 .financial-label { color: var(--text-mid); font-weight: 500; }
