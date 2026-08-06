@@ -360,6 +360,37 @@ describe('perProjectFinancials', () => {
     expect(store.perProjectFinancials!['P2']).toBeDefined()
   })
 
+  it('precio/Ha × área reemplaza a arriendo_anual cuando ambos existen — valores reales COLBOYT147P1 (10.510.000 COP/Ha × 2.5 Ha)', async () => {
+    const store = useEvaluatorStore()
+    vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue({
+      code: 'COLSANT5', name: 'Test', municipality: 'Giron', or: 'ESSA',
+      nivel_tension: '13.8kV', cluster: 2,
+      ocupacion_cauce: false, ocupacion_cauce_detalle: 'No Requiere',
+      servidumbre: 0, servidumbre_detalle: null,
+      coexistencias: false, coexistencias_detalle: [],
+      produccion_especifica: 4.117, arriendo_anual: 20_000_000, area_hectareas: 2.5, precio_hectarea: 10_510_000,
+      proyectos: [
+        // arriendo_anual=0 (como el termsheet real de COLBOYT147P1, sin diligenciar) pero
+        // con precio_hectarea/area_hectareas presentes — debe ganar el calculado.
+        { nombre: 'P1', distancia_via: null, distancia_red: null, aprovechamiento_forestal: null, aprovechamiento_forestal_detalle: null, numero_arboles: null, tipo_estructura: null, arriendo_anual: 0, precio_hectarea: 10_510_000, area_hectareas: 2.5 },
+      ],
+    })
+    await store.fetchTerrain('COLSANT5')
+
+    // Un solo proyecto en el terreno → crédito de cluster completo (-15M), sin dividir.
+    const esperado = calcularFinanzas({
+      capex: store.baseCapex - 15_000_000, kWp: store.kWp, kVA: store.kVA,
+      produccionEspecifica: 4.117, arriendoAnual: 26_275_000,
+    })
+    const usandoArriendoAnualCero = calcularFinanzas({
+      capex: store.baseCapex - 15_000_000, kWp: store.kWp, kVA: store.kVA,
+      produccionEspecifica: 4.117, arriendoAnual: 0,
+    })
+
+    expect(store.perProjectFinancials!['P1'].vpn).toBeCloseTo(esperado.vpn, 6)
+    expect(store.perProjectFinancials!['P1'].vpn).not.toBeCloseTo(usandoArriendoAnualCero.vpn, 6)
+  })
+
   it('arriendoManual sirve de fallback para un proyecto sin arriendo_anual propio', async () => {
     const store = useEvaluatorStore()
     vi.spyOn(terrainService, 'fetchTerrainData').mockResolvedValue({

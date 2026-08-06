@@ -34,8 +34,9 @@ function areaProyecto(nombre: string): number | null {
   return store.terrainData?.proyectos.find(p => p.nombre === nombre)?.area_hectareas ?? null
 }
 
-// Solo informativo — no alimenta TIR/VPN/Payback (esos usan el arriendo_anual del
-// termsheet). Sirve para comparar contra ese dato: Precio/Ha × Ha arrendadas del proyecto.
+// Precio/Ha × Ha arrendadas del proyecto — este es el valor que TIR/VPN/Payback usan como
+// arriendo cuando ambos datos existen (más confiable que arriendo_anual del termsheet, ver
+// evaluatorStore.arriendoParaProyecto).
 function arriendoCalculadoProyecto(nombre: string): number | null {
   const precio = precioHectareaProyecto(nombre)
   const area = areaProyecto(nombre)

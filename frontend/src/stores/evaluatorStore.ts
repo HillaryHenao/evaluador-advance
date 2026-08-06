@@ -4,7 +4,7 @@ import { fetchTerrainData } from '@/services/terrainService'
 import { loadCriteria, evaluateScoped, aggregateCosts } from '@/engine/evaluatorEngine'
 import { calcularFinanzas } from '@/engine/financialEngine'
 import { useAuthStore } from '@/stores/authStore'
-import type { TerrainData, CriterionValue, CriterionResult, AggregatedResult, FinancialResults } from '@/types'
+import type { TerrainData, CriterionValue, CriterionResult, AggregatedResult, FinancialResults, ProyectoData } from '@/types'
 
 type CriterionValues = Record<string, CriterionValue>
 type PerProjectValues = Record<string, Record<string, CriterionValue>>
@@ -45,6 +45,18 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
   // fija (o tipo aún sin resolver) no lleva ajuste. Ver FACTOR_PRODUCCION_TRACKER.
   function produccionEspecificaParaProyecto(nombre: string, base: number): number {
     return perProjectValues.value.tipo_estructura?.[nombre] === 'tracker' ? base * FACTOR_PRODUCCION_TRACKER : base
+  }
+
+  // Precio/Ha × Área negociada (ambos por proyecto, vía minifarm_project) es más confiable
+  // que termsheet.rent_annual_cost_cop — ese campo puede quedar en 0/sin diligenciar aunque
+  // el proyecto ya tenga precio y área cargados (caso real COLBOYT147P1: arriendo_anual=0,
+  // pero 10.510.000 COP/Ha × 2.5 Ha = 26.275.000). Por eso el calculado tiene prioridad
+  // siempre que existan ambos datos; si falta cualquiera, se cae a arriendo_anual/manual.
+  function arriendoParaProyecto(proyecto: ProyectoData): number | null {
+    if (proyecto.precio_hectarea != null && proyecto.area_hectareas != null) {
+      return proyecto.precio_hectarea * proyecto.area_hectareas
+    }
+    return proyecto.arriendo_anual ?? arriendoManual.value
   }
 
   // baseCapex y kWp son magnitudes POR PROYECTO (cada proyecto construye su propia
@@ -94,7 +106,7 @@ export const useEvaluatorStore = defineStore('evaluador', () => {
 
     const resultado: Record<string, FinancialResults> = {}
     for (const proyecto of terrainData.value?.proyectos ?? []) {
-      const arriendoProyecto = proyecto.arriendo_anual ?? arriendoManual.value
+      const arriendoProyecto = arriendoParaProyecto(proyecto)
       // 0 es un arriendo válido (ej. COLBOYT147) — solo null/undefined significa "falta el dato".
       if (arriendoProyecto == null) continue
 
