@@ -307,7 +307,22 @@ def _get_proyectos_activos(terrain_id: int) -> list[dict]:
                        p.road_distance                             AS distancia_via,
                        p.network_distance                          AS distancia_red,
                        p.annual_price                              AS precio_hectarea,
-                       p.area_m2                                   AS rent_area_m2,
+                       -- Área negociada: si el propio proyecto no la tiene diligenciada (0)
+                       -- pero su termsheet es 'none' (no se aparciona/divide entre proyectos
+                       -- — el área es una sola para todo el termsheet), se toma la de un
+                       -- proyecto hermano bajo el mismo termsheet que sí la tenga. Caso real:
+                       -- COLBOYT147, termsheet 842, apportionment 'none' —
+                       -- P1.area_m2=25.000, P2.area_m2=0.
+                       COALESCE(
+                           NULLIF(p.area_m2, 0),
+                           CASE
+                               WHEN (SELECT ts.apportionment FROM termsheet_termsheet ts WHERE ts.id = p.termsheet_id) = 'none'
+                               THEN (
+                                   SELECT MAX(p2.area_m2) FROM minifarm_project p2
+                                   WHERE p2.termsheet_id = p.termsheet_id AND p2.area_m2 > 0
+                               )
+                           END
+                       )                                           AS rent_area_m2,
                        (
                            SELECT vf.value FROM validation_field vf
                            WHERE (vf.project_id = p.id OR vf.terrain_id = p.terrain_id)
